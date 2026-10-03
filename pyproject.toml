@@ -1,0 +1,29 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "build", "__pycache__"]
+
+[tool.ruff.lint]
+ignore = ["E501"]
+
+[project]
+name = "smartroute"
+version = "1.0.0"
+description = "AI-Powered Smart Traffic & Route Optimization for Bangalore"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["routing", "machine-learning", "traffic", "pathfinding", "maps"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: GIS",
+]

@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+*.ipynb_checkpoints/
+
+# C++
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.lib
+core/build/
+cmake-build-*/
+
+# Models are intentionally tracked for reproducible inference.
+
+# Large or downloaded source data
+data/raw/
+data/*.osm
+data/*.graphml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Environment and generated files
+.env
+*.env
+.pytest_cache/
+cache/
+data/edge_weights_*.json

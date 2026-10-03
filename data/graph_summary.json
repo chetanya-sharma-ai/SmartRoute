@@ -1,0 +1,13 @@
+{
+  "place": "Indiranagar, Bangalore, India",
+  "num_nodes": 322,
+  "num_edges": 838,
+  "bounds": {
+    "min_lon": 77.6308356,
+    "min_lat": 12.9684181,
+    "max_lon": 77.6567723,
+    "max_lat": 12.9938145
+  },
+  "center_lat": 12.9811163,
+  "center_lon": 77.64380395
+}

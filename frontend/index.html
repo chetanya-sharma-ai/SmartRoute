@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartRoute — AI Traffic & Route Optimization · Bangalore</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    #sidebar {
+      width: 340px;
+      min-width: 300px;
+      background: #1e293b;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      overflow-y: auto;
+      z-index: 1000;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+    }
+
+    .sidebar-header {
+      padding: 20px 20px 16px;
+      background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%);
+    }
+    .sidebar-header h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .sidebar-header p {
+      font-size: 0.78rem;
+      opacity: 0.85;
+      margin-top: 4px;
+    }
+
+    .section {
+      padding: 16px 20px;
+      border-bottom: 1px solid #334155;
+    }
+    .section h2 {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    input, select {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { border-color: #3b82f6; }
+
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: white;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-secondary {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
+    .btn-secondary:hover { border-color: #3b82f6; color: #e2e8f0; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* ── Status / Result panels ────────────────────────────────── */
+    #status-bar {
+      padding: 10px 20px;
+      background: #0f172a;
+      font-size: 0.78rem;
+      color: #64748b;
+      border-bottom: 1px solid #1e293b;
+      min-height: 36px;
+    }
+    #status-bar.loading { color: #60a5fa; }
+    #status-bar.error   { color: #f87171; }
+    #status-bar.success { color: #4ade80; }
+
+    #result-panel {
+      padding: 16px 20px;
+      display: none;
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stat-card {
+      background: #0f172a;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+      border: 1px solid #1e293b;
+    }
+    .stat-card .val {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #60a5fa;
+    }
+    .stat-card .lbl {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .congestion-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .badge-Low    { background: #14532d; color: #4ade80; }
+    .badge-Medium { background: #78350f; color: #fbbf24; }
+    .badge-High   { background: #7f1d1d; color: #f87171; }
+
+    /* ── Map ─────────────────────────────────────────────────────── */
+    #map {
+      flex: 1;
+      height: 100vh;
+    }
+
+    /* ── Legend ──────────────────────────────────────────────────── */
+    .map-legend {
+      background: rgba(15,23,42,0.92);
+      border: 1px solid #334155;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      color: #e2e8f0;
+      backdrop-filter: blur(4px);
+    }
+    .map-legend h3 { font-size: 0.7rem; color: #94a3b8; margin-bottom: 8px; }
+    .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Heatmap toggle ──────────────────────────────────────────── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .toggle-row span { font-size: 0.82rem; color: #94a3b8; }
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #334155;
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+    .slider::before {
+      content: "";
+      position: absolute;
+      width: 18px; height: 18px;
+      left: 3px; top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+    input:checked + .slider { background: #3b82f6; }
+    input:checked + .slider::before { transform: translateX(20px); }
+
+    /* ── Time slider ─────────────────────────────────────────────── */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+      padding: 0;
+      border: none;
+      margin-bottom: 4px;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      background: #334155;
+      height: 6px;
+      border-radius: 3px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      background: #3b82f6;
+      border-radius: 50%;
+      margin-top: -6px;
+      cursor: pointer;
+    }
+    #hour-label {
+      text-align: center;
+      font-size: 0.82rem;
+      color: #60a5fa;
+      margin-bottom: 8px;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #334155;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .tip { font-size: 0.72rem; color: #475569; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ────────────────────────────────────────────────────────────── -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <h1>🚦 SmartRoute</h1>
+    <p>AI-Powered Traffic & Route Optimization · Bangalore</p>
+  </div>
+
+  <!-- Status bar -->
+  <div id="status-bar">Ready. Enter source and destination node IDs.</div>
+
+  <!-- Route section -->
+  <div class="section">
+    <h2>Route Planner</h2>
+
+    <label>Source Node ID</label>
+    <input type="number" id="src-input" placeholder="e.g. 123456789" />
+
+    <label>Destination Node ID</label>
+    <input type="number" id="dst-input" placeholder="e.g. 987654321" />
+
+    <label>Algorithm</label>
+    <select id="algo-select">
+      <option value="astar">A* (Faster — recommended)</option>
+      <option value="dijkstra">Dijkstra</option>
+    </select>
+
+    <button class="btn btn-primary" id="find-route-btn" onclick="findRoute()">
+      🗺 Find Optimal Route
+    </button>
+    <button class="btn btn-secondary" onclick="clearRoute()">✕ Clear Route</button>
+    <p class="tip">💡 Click on the map to pick source/destination nodes</p>
+  </div>
+
+  <!-- Time & Weather section -->
+  <div class="section">
+    <h2>Traffic Conditions</h2>
+
+    <div id="hour-label">⏰ 08:00</div>
+    <input type="range" id="hour-slider" min="0" max="23" value="8"
+           oninput="onHourChange(this.value)" />
+
+    <label>Weather</label>
+    <select id="weather-select" onchange="onConditionsChange()">
+      <option value="Clear">☀️ Clear</option>
+      <option value="Clouds">🌤 Cloudy</option>
+      <option value="Rain">🌧 Rain</option>
+      <option value="Drizzle">🌦 Drizzle</option>
+      <option value="Fog">🌫 Fog</option>
+      <option value="Mist">🌁 Mist</option>
+      <option value="Haze">😶‍🌫️ Haze</option>
+    </select>
+  </div>
+
+  <!-- Layers section -->
+  <div class="section">
+    <h2>Map Layers</h2>
+    <div class="toggle-row">
+      <span>🔥 Traffic Heatmap</span>
+      <label class="toggle">
+        <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()" />
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Result panel -->
+  <div id="result-panel">
+    <h2 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
+               letter-spacing:1px;color:#94a3b8;margin-bottom:12px;">
+      Route Result
+    </h2>
+    <div id="congestion-badge-container"></div>
+    <div class="stat-grid" id="stats-grid"></div>
+    <div id="congestion-desc" style="font-size:0.8rem;color:#94a3b8;
+         background:#0f172a;padding:10px;border-radius:8px;
+         border:1px solid #1e293b;"></div>
+  </div>
+</aside>
+
+<!-- ── Map ────────────────────────────────────────────────────────────────── -->
+<div id="map"></div>
+
+<script>
+  // ── Config ─────────────────────────────────────────────────────────────────
+  // When served by FastAPI (/app), the API is at the same origin.
+  // When opened as a local file (file://), fall back to localhost:8000.
+  const API_BASE = (window.location.protocol === 'file:')
+    ? 'http://localhost:8000'
+    : window.location.origin;
+  const DEFAULT_CENTER = [12.9716, 77.5946]; // Bangalore center
+  const DEFAULT_ZOOM   = 13;
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let map, routeLayer, heatmapLayer, markerSrc, markerDst;
+  let clickMode = null; // 'src' | 'dst' | null
+  let currentHour = 8;
+  let currentWeather = 'Clear';
+
+  // ── Leaflet init ──────────────────────────────────────────────────────────
+  map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  // Map legend
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = () => {
+    const div = L.DomUtil.create('div', 'map-legend');
+    div.innerHTML = `<h3>CONGESTION LEVEL</h3>
+      <div class="legend-row"><div class="legend-dot" style="background:#22c55e"></div>Low — Free flow</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#f59e0b"></div>Medium — Moderate</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#ef4444"></div>High — Congested</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#60a5fa"></div>Selected Route</div>`;
+    return div;
+  };
+  legend.addTo(map);
+
+  // ── Click to pick nodes ───────────────────────────────────────────────────
+  map.on('click', async (e) => {
+    const { lat, lng } = e.latlng;
+    const res = await apiFetch(`/nodes/nearest?lat=${lat}&lon=${lng}`);
+    if (!res || res.error) return;
+
+    if (!document.getElementById('src-input').value) {
+      document.getElementById('src-input').value = res.node_id;
+      placeMarker('src', res.lat, res.lon, res.node_id);
+    } else if (!document.getElementById('dst-input').value) {
+      document.getElementById('dst-input').value = res.node_id;
+      placeMarker('dst', res.lat, res.lon, res.node_id);
+    }
+  });
+
+  function placeMarker(type, lat, lon, nodeId) {
+    const color = type === 'src' ? '#22c55e' : '#ef4444';
+    const label = type === 'src' ? '🟢 Source' : '🔴 Dest';
+    const icon = L.divIcon({
+      html: `<div style="background:${color};width:16px;height:16px;
+                border-radius:50%;border:3px solid white;box-shadow:0 0 6px ${color}"></div>`,
+      iconSize: [16, 16], iconAnchor: [8, 8]
+    });
+    if (type === 'src') {
+      if (markerSrc) markerSrc.remove();
+      markerSrc = L.marker([lat, lon], { icon }).addTo(map)
+                   .bindPopup(`<b>${label}</b><br>Node: ${nodeId}`);
+    } else {
+      if (markerDst) markerDst.remove();
+      markerDst = L.marker([lat, lon], { icon }).addTo(map)
+                   .bindPopup(`<b>${label}</b><br>Node: ${nodeId}`);
+    }
+  }
+
+  // ── API helpers ────────────────────────────────────────────────────────────
+  async function apiFetch(path) {
+    try {
+      const r = await fetch(API_BASE + path);
+      return await r.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setStatus(msg, type = '') {
+    const el = document.getElementById('status-bar');
+    el.className = type;
+    el.innerHTML = type === 'loading'
+      ? `<span class="spinner"></span>${msg}`
+      : msg;
+  }
+
+  // ── Hour slider ───────────────────────────────────────────────────────────
+  function onHourChange(val) {
+    currentHour = parseInt(val);
+    const h = String(currentHour).padStart(2, '0');
+    document.getElementById('hour-label').textContent = `⏰ ${h}:00`;
+    onConditionsChange();
+  }
+
+  function onConditionsChange() {
+    currentWeather = document.getElementById('weather-select').value;
+    if (document.getElementById('heatmap-toggle').checked) {
+      loadHeatmap();
+    }
+  }
+
+  // ── Find Route ────────────────────────────────────────────────────────────
+  async function findRoute() {
+    const src  = document.getElementById('src-input').value.trim();
+    const dst  = document.getElementById('dst-input').value.trim();
+    const algo = document.getElementById('algo-select').value;
+
+    if (!src || !dst) {
+      setStatus('⚠️ Please enter both source and destination node IDs.', 'error');
+      return;
+    }
+
+    document.getElementById('find-route-btn').disabled = true;
+    setStatus(`Computing route with ${algo.toUpperCase()}...`, 'loading');
+
+    const url = `/route?src=${src}&dst=${dst}&hour=${currentHour}`
+              + `&weather=${currentWeather}&algo=${algo}`;
+    const data = await apiFetch(url);
+
+    document.getElementById('find-route-btn').disabled = false;
+
+    if (!data || data.error || data.detail) {
+      setStatus(`❌ ${data?.error || data?.detail || 'Failed to get route'}`, 'error');
+      return;
+    }
+
+    drawRoute(data);
+    showResults(data);
+    setStatus(`✅ Route found via ${data.algorithm}`, 'success');
+  }
+
+  // ── Draw Route on Map ─────────────────────────────────────────────────────
+  function drawRoute(data) {
+    if (routeLayer) routeLayer.remove();
+    if (!data.path || data.path.length === 0) return;
+
+    const coords = data.path.map(n => [n.lat, n.lon]);
+
+    routeLayer = L.layerGroup();
+
+    // Animated dashed route line
+    L.polyline(coords, {
+      color: '#60a5fa',
+      weight: 5,
+      opacity: 0.9,
+      dashArray: '10, 6',
+      lineCap: 'round'
+    }).addTo(routeLayer);
+
+    // Direction arrows (every ~10 nodes)
+    for (let i = 0; i < coords.length - 1; i += 10) {
+      const mid = [
+        (coords[i][0] + coords[i+1][0]) / 2,
+        (coords[i][1] + coords[i+1][1]) / 2
+      ];
+      const arrow = L.divIcon({
+        html: '→',
+        className: '',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+    }
+
+    // Source + destination markers with labels
+    const first = data.path[0];
+    const last  = data.path[data.path.length - 1];
+    placeMarker('src', first.lat, first.lon, data.src);
+    placeMarker('dst', last.lat,  last.lon,  data.dst);
+
+    routeLayer.addTo(map);
+    map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
+  }
+
+  // ── Show Result Panel ─────────────────────────────────────────────────────
+  function showResults(data) {
+    const panel = document.getElementById('result-panel');
+    panel.style.display = 'block';
+
+    const ctx = data.congestion_context || {};
+    const cong = ctx.congestion_level || 'Low';
+
+    // Badge
+    document.getElementById('congestion-badge-container').innerHTML =
+      `<span class="congestion-badge badge-${cong}">${cong} Traffic</span>`;
+
+    // Stats
+    const distKm = (data.total_distance_m / 1000).toFixed(2);
+    const eta    = data.eta_minutes?.toFixed(1) || '—';
+    const nodes  = data.num_nodes || '—';
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat-card"><div class="val">${distKm}</div><div class="lbl">km</div></div>
+      <div class="stat-card"><div class="val">${eta}</div><div class="lbl">min ETA</div></div>
+      <div class="stat-card"><div class="val">${nodes}</div><div class="lbl">waypoints</div></div>
+      <div class="stat-card"><div class="val">${data.algorithm?.replace('_python_fallback','')?.toUpperCase()}</div>
+        <div class="lbl">algorithm</div></div>`;
+
+    // Description
+    document.getElementById('congestion-desc').textContent =
+      ctx.description || '';
+  }
+
+  // ── Clear Route ───────────────────────────────────────────────────────────
+  function clearRoute() {
+    if (routeLayer) routeLayer.remove();
+    if (markerSrc)  markerSrc.remove();
+    if (markerDst)  markerDst.remove();
+    markerSrc = markerDst = null;
+    document.getElementById('src-input').value = '';
+    document.getElementById('dst-input').value = '';
+    document.getElementById('result-panel').style.display = 'none';
+    setStatus('Route cleared.');
+  }
+
+  // ── Heatmap ───────────────────────────────────────────────────────────────
+  async function toggleHeatmap() {
+    const enabled = document.getElementById('heatmap-toggle').checked;
+    if (enabled) {
+      await loadHeatmap();
+    } else {
+      if (heatmapLayer) { heatmapLayer.remove(); heatmapLayer = null; }
+    }
+  }
+
+  async function loadHeatmap() {
+    if (heatmapLayer) heatmapLayer.remove();
+    setStatus('Loading traffic heatmap...', 'loading');
+
+    const day = new Date().getDay();
+    const url = `/heatmap?hour=${currentHour}&weather=${currentWeather}&day=${day}`;
+    const data = await apiFetch(url);
+
+    if (!data || !data.features) {
+      setStatus('❌ Could not load heatmap (graph data missing)', 'error');
+      return;
+    }
+
+    heatmapLayer = L.geoJSON(data, {
+      style: feature => ({
+        color: feature.properties.color,
+        weight: 3,
+        opacity: 0.75
+      }),
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties;
+        layer.bindPopup(
+          `<b>${p.congestion}</b> congestion<br>${p.length_m}m segment`
+        );
+      }
+    }).addTo(map);
+
+    setStatus(`✅ Heatmap loaded (${data.features.length} segments)`, 'success');
+  }
+
+  // ── Init: fetch graph summary to center map ────────────────────────────────
+  (async () => {
+    const summary = await apiFetch('/graph/summary');
+    if (summary && summary.center_lat) {
+      map.setView([summary.center_lat, summary.center_lon], 13);
+    }
+  })();
+</script>
+</body>
+</html>

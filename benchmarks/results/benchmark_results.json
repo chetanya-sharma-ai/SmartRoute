@@ -1,0 +1,94 @@
+{
+  "benchmarks": [
+    {
+      "n_nodes": 100,
+      "n_edges": 400,
+      "n_trials": 30,
+      "dijkstra": {
+        "avg_ms": 0.0416,
+        "median_ms": 0.0435,
+        "avg_nodes_expanded": 51.0
+      },
+      "astar": {
+        "avg_ms": 0.0697,
+        "median_ms": 0.0755,
+        "avg_nodes_expanded": 27.0
+      },
+      "astar_speedup_x": 0.6,
+      "node_reduction_pct": 47.1,
+      "optimal_paths_match": true
+    },
+    {
+      "n_nodes": 500,
+      "n_edges": 2000,
+      "n_trials": 30,
+      "dijkstra": {
+        "avg_ms": 0.4964,
+        "median_ms": 0.2876,
+        "avg_nodes_expanded": 235.5
+      },
+      "astar": {
+        "avg_ms": 0.5101,
+        "median_ms": 0.4039,
+        "avg_nodes_expanded": 163.4
+      },
+      "astar_speedup_x": 0.97,
+      "node_reduction_pct": 30.6,
+      "optimal_paths_match": true
+    },
+    {
+      "n_nodes": 1000,
+      "n_edges": 4000,
+      "n_trials": 30,
+      "dijkstra": {
+        "avg_ms": 0.6865,
+        "median_ms": 0.6446,
+        "avg_nodes_expanded": 589.7
+      },
+      "astar": {
+        "avg_ms": 1.1579,
+        "median_ms": 1.2166,
+        "avg_nodes_expanded": 392.3
+      },
+      "astar_speedup_x": 0.59,
+      "node_reduction_pct": 33.5,
+      "optimal_paths_match": true
+    },
+    {
+      "n_nodes": 2000,
+      "n_edges": 8000,
+      "n_trials": 30,
+      "dijkstra": {
+        "avg_ms": 1.3568,
+        "median_ms": 1.156,
+        "avg_nodes_expanded": 946.1
+      },
+      "astar": {
+        "avg_ms": 2.725,
+        "median_ms": 2.0124,
+        "avg_nodes_expanded": 563.8
+      },
+      "astar_speedup_x": 0.5,
+      "node_reduction_pct": 40.4,
+      "optimal_paths_match": true
+    },
+    {
+      "n_nodes": 5000,
+      "n_edges": 20000,
+      "n_trials": 30,
+      "dijkstra": {
+        "avg_ms": 6.3095,
+        "median_ms": 6.4409,
+        "avg_nodes_expanded": 2819.5
+      },
+      "astar": {
+        "avg_ms": 9.7867,
+        "median_ms": 10.4561,
+        "avg_nodes_expanded": 1864.1
+      },
+      "astar_speedup_x": 0.64,
+      "node_reduction_pct": 33.9,
+      "optimal_paths_match": true
+    }
+  ]
+}

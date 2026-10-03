@@ -1,0 +1,23 @@
+{
+  "features": [
+    "hour",
+    "day_of_week",
+    "is_weekend",
+    "is_holiday",
+    "month",
+    "temp_c",
+    "road_length_m",
+    "weather_Clear",
+    "weather_Clouds",
+    "weather_Rain",
+    "weather_Drizzle",
+    "weather_Fog",
+    "weather_Mist",
+    "weather_Haze"
+  ],
+  "label_map": {
+    "0": "Low",
+    "1": "Medium",
+    "2": "High"
+  }
+}
