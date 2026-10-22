@@ -196,6 +196,18 @@
       font-size: 0.71rem;
       line-height: 1.35;
     }
+    .displayed-scenario-row {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+    }
+    .displayed-scenario-row .key { color: #94a3b8; }
+    .displayed-scenario-row .val { color: #60a5fa; font-weight: 700; }
+
 
     /* ── Scenario preset buttons ─────────────────────────────────── */
     .preset-grid {
@@ -454,9 +466,17 @@
 
     <!-- Active scenario summary card -->
     <div class="scenario-info-card" id="scenario-info-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;">Selected Scenario:</span>
+        <span id="scenario-info-badge" style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:#1e3a5f;color:#93c5fd;font-weight:600;">Active</span>
+      </div>
       <div class="scenario-info-title" id="scenario-info-title">🟢 Normal conditions</div>
       <div class="scenario-info-detail" id="scenario-info-detail">
         Standard traffic flow across Indiranagar. Free-flow baseline route calculation with no incident blocks.
+      </div>
+      <div class="displayed-scenario-row" id="displayed-scenario-row">
+        <span class="key">Displayed Route:</span>
+        <span class="val" id="displayed-scenario-val">None (not calculated)</span>
       </div>
     </div>
 
@@ -558,6 +578,10 @@
                letter-spacing:1px;color:#94a3b8;margin-bottom:12px;">
       Route Result
     </h2>
+    <div id="result-scenario-banner" style="background:#0f172a;border:1px solid #3b82f6;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:0.75rem;">
+      <div style="color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;">Displayed Route Scenario</div>
+      <div id="result-scenario-name" style="font-weight:700;color:#60a5fa;margin-top:2px;"></div>
+    </div>
     <div id="congestion-badge-container"></div>
     <div class="stat-grid" id="stats-grid"></div>
     <div id="incident-panel">
@@ -650,6 +674,9 @@
   let currentScenario = 'normal';
   let activePicker = null; // 'src' | 'dst' | null
   let isRouteStale = false;
+  let activeRouteRequestId = 0;
+  let activeRouteAbortController = null;
+  let displayedRouteScenario = null;
 
   // ── Leaflet init ──────────────────────────────────────────────────────────
   map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
@@ -689,8 +716,16 @@
     document.getElementById('scenario-info-detail').textContent =
       `${info.detail} (Target road: ${info.target})`;
 
-    markRouteStale(`Scenario switched to "${info.name}". Source & destination preserved.`);
-    setStatus(`Active scenario: ${info.name}. Click "Find Safe Route" to compute with current trip points.`);
+    // Preserve existing origin/destination. Immediately recalculate if both nodes exist.
+    const src = document.getElementById('src-input').value.trim();
+    const dst = document.getElementById('dst-input').value.trim();
+    if (src && dst) {
+      markRouteStale(`Scenario switched to "${info.name}". Recalculating with current nodes (${src} → ${dst})…`);
+      findRoute();
+    } else {
+      markRouteStale(`Scenario switched to "${info.name}". Source & destination preserved.`);
+      setStatus(`Active scenario: ${info.name}. Please enter source and destination nodes.`);
+    }
   }
 
   function onDropdownScenarioChange(val) {
@@ -709,8 +744,8 @@
 
     map.fitBounds([[p.srcLat, p.srcLon], [p.dstLat, p.dstLon]], { padding: [60, 60] });
 
-    markRouteStale(`Loaded verified example trip for ${SCENARIO_INFO[currentScenario].name}: ${p.src} → ${p.dst}.`);
-    setStatus(`✅ Loaded example trip (${p.src} → ${p.dst}) for ${SCENARIO_INFO[currentScenario].name}. Click "Find Safe Route".`, 'success');
+    markRouteStale(`Loaded verified example trip for ${SCENARIO_INFO[currentScenario].name}: ${p.src} → ${p.dst}. Calculating…`);
+    findRoute();
   }
 
   // ── Explicit Map Picker Controls ──────────────────────────────────────────
@@ -755,6 +790,20 @@
       const err = res?.error || res?.detail?.message || 'Selected location is outside the Indiranagar graph area.';
       setStatus(`⚠️ ${err}`, 'error');
       return;
+    }
+
+    // Changing trip points invalidates any in-flight route calculation
+    activeRouteRequestId++;
+    if (activeRouteAbortController) {
+      try { activeRouteAbortController.abort(); } catch (e) {}
+      activeRouteAbortController = null;
+    }
+    const btn = document.getElementById('find-route-btn');
+    if (btn) btn.disabled = false;
+
+    const dispValEl = document.getElementById('displayed-scenario-val');
+    if (dispValEl) {
+      dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Point changed)</span>';
     }
 
     if (activePicker === 'src') {
@@ -817,7 +866,20 @@
 
   // ── Input synchronization & Stale State ────────────────────────────────────
   function onInputChanged(type) {
+    // Invalidate in-flight calculation so outdated response won't show for updated node inputs
+    activeRouteRequestId++;
+    if (activeRouteAbortController) {
+      try { activeRouteAbortController.abort(); } catch (e) {}
+      activeRouteAbortController = null;
+    }
+    const btn = document.getElementById('find-route-btn');
+    if (btn) btn.disabled = false;
+
     markRouteStale(`Node ID manually updated.`);
+    const dispValEl = document.getElementById('displayed-scenario-val');
+    if (dispValEl) {
+      dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Node changed)</span>';
+    }
   }
 
   function markRouteStale(reason) {
@@ -846,9 +908,9 @@
   }
 
   // ── API helpers ────────────────────────────────────────────────────────────
-  async function apiFetch(path) {
+  async function apiFetch(path, options = {}) {
     try {
-      const r = await fetch(API_BASE + path);
+      const r = await fetch(API_BASE + path, options);
       if (!r.ok) {
         let detail = r.statusText;
         try { const j = await r.json(); detail = j.detail || j.message || detail; } catch {}
@@ -856,6 +918,9 @@
       }
       return await r.json();
     } catch (e) {
+      if (e.name === 'AbortError') {
+        return { aborted: true };
+      }
       return { error: e.message };
     }
   }
@@ -877,14 +942,27 @@
   }
 
   function onConditionsChange() {
+    // Invalidate in-flight calculation
+    activeRouteRequestId++;
+    if (activeRouteAbortController) {
+      try { activeRouteAbortController.abort(); } catch (e) {}
+      activeRouteAbortController = null;
+    }
+    const btn = document.getElementById('find-route-btn');
+    if (btn) btn.disabled = false;
+
     currentWeather = document.getElementById('weather-select').value;
     markRouteStale('Traffic conditions updated.');
+    const dispValEl = document.getElementById('displayed-scenario-val');
+    if (dispValEl && displayedRouteScenario) {
+      dispValEl.innerHTML = `<span style="color:#f59e0b">⚠️ Stale (${SCENARIO_INFO[displayedRouteScenario]?.name || displayedRouteScenario})</span>`;
+    }
     if (document.getElementById('heatmap-toggle').checked) {
       loadHeatmap();
     }
   }
 
-  // ── Find Route ────────────────────────────────────────────────────────────
+  // ── Find Route ────────────────────────────────────────────────────
   async function findRoute() {
     const src      = document.getElementById('src-input').value.trim();
     const dst      = document.getElementById('dst-input').value.trim();
@@ -901,45 +979,114 @@
       return;
     }
 
+    // Cancel any previous in-flight request
+    if (activeRouteAbortController) {
+      try { activeRouteAbortController.abort(); } catch (e) {}
+    }
+    activeRouteAbortController = new AbortController();
+    const currentSignal = activeRouteAbortController.signal;
+    const requestId = ++activeRouteRequestId;
+
     const btn = document.getElementById('find-route-btn');
     btn.disabled = true;
-    setStatus(`Computing safe route with ${algo.toUpperCase()}…`, 'loading');
+
+    const scenarioName = SCENARIO_INFO[scenario]?.name || scenario;
+    setStatus(`Computing safe route with ${algo.toUpperCase()} for ${scenarioName}…`, 'loading');
+
+    // Keep stale warning banner visible while request is running
+    markRouteStale(`Calculating route for ${scenarioName} (previous route is stale)…`);
+    const dispValEl = document.getElementById('displayed-scenario-val');
+    if (dispValEl) {
+      dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Recalculating…)</span>';
+    }
 
     try {
       const url = `/route?src=${encodeURIComponent(src)}&dst=${encodeURIComponent(dst)}&hour=${currentHour}`
                 + `&weather=${encodeURIComponent(currentWeather)}&algo=${encodeURIComponent(algo)}`
                 + `&scenario=${encodeURIComponent(scenario)}&priority=${encodeURIComponent(priority)}`;
-      const data = await apiFetch(url);
+      const data = await apiFetch(url, { signal: currentSignal });
 
-      if (!data || data.error) {
-        const msg = data?.error || 'Failed to get route';
-        const tip = data?.tip
-          ? `<br><span style="color:#cbd5e1;font-size:0.75rem">${data.tip}</span>`
-          : '';
-        setStatus(`❌ ${msg}${tip}`, 'error');
-        document.getElementById('result-panel').style.display = 'none';
-        return;
-      }
-      if (data.detail) {
-        const msg = typeof data.detail === 'object'
-          ? (data.detail.message || JSON.stringify(data.detail))
-          : data.detail;
-        const tip = typeof data.detail === 'object' && data.detail.tip
-          ? `<br><span style="color:#cbd5e1;font-size:0.75rem">${data.detail.tip}</span>`
-          : '';
-        setStatus(`❌ ${msg}${tip}`, 'error');
-        document.getElementById('result-panel').style.display = 'none';
+      // If aborted or superseded by a newer request, discard silently
+      if (data?.aborted || requestId !== activeRouteRequestId) {
         return;
       }
 
+      if (!data || data.error || data.detail) {
+        let msg = data?.error;
+        let tip = '';
+        if (data?.detail) {
+          if (typeof data.detail === 'object') {
+            msg = data.detail.message || JSON.stringify(data.detail);
+            tip = data.detail.tip ? `<br><span style="color:#cbd5e1;font-size:0.75rem">${data.detail.tip}</span>` : '';
+          } else {
+            msg = data.detail;
+          }
+        }
+        msg = msg || 'Failed to get route';
+
+        // On failure, do not leave the old route looking current!
+        if (routeLayer) {
+          routeLayer.remove();
+          routeLayer = null;
+        }
+        displayedRouteScenario = null;
+        if (dispValEl) {
+          dispValEl.innerHTML = '<span style="color:#f87171">None (Route unavailable)</span>';
+        }
+        document.getElementById('result-panel').style.display = 'none';
+
+        // Keep stale banner visible explaining failure
+        const banner = document.getElementById('stale-banner');
+        if (banner) {
+          banner.style.display = 'block';
+          banner.innerHTML = `⚠️ <strong>Route unavailable:</strong> ${msg}. No route currently displayed.`;
+        }
+        isRouteStale = true;
+
+        setStatus(`❌ ${msg}${tip}`, 'error');
+        return;
+      }
+
+      // Latest request succeeded!
       clearRouteStale();
+      displayedRouteScenario = data.incident_context?.scenario || scenario;
+      const incLabel = data.incident_context?.label || scenarioName;
+      const affectedCount = data.incident_context?.affected_segments ?? 0;
+
+      if (dispValEl) {
+        dispValEl.textContent = `${incLabel} (${affectedCount} segments affected)`;
+      }
+
       drawRoute(data);
       showResults(data);
-      setStatus(`✅ Safe route found via ${data.algorithm} — ${data.incident_context?.label || 'Normal conditions'}`, 'success');
+      setStatus(`✅ Safe route found via ${data.algorithm} — ${incLabel} (${affectedCount} affected segments)`, 'success');
     } catch (err) {
+      if (err.name === 'AbortError' || requestId !== activeRouteRequestId) {
+        return;
+      }
+      // On failure, do not leave the old route looking current!
+      if (routeLayer) {
+        routeLayer.remove();
+        routeLayer = null;
+      }
+      displayedRouteScenario = null;
+      if (dispValEl) {
+        dispValEl.innerHTML = '<span style="color:#f87171">None (Network error)</span>';
+      }
+      document.getElementById('result-panel').style.display = 'none';
+
+      const banner = document.getElementById('stale-banner');
+      if (banner) {
+        banner.style.display = 'block';
+        banner.innerHTML = `⚠️ <strong>Network error:</strong> ${err.message}. Previous route cleared.`;
+      }
+      isRouteStale = true;
+
       setStatus(`❌ Network error: ${err.message}`, 'error');
     } finally {
-      btn.disabled = false;
+      if (requestId === activeRouteRequestId) {
+        btn.disabled = false;
+      }
     }
   }
 
@@ -979,6 +1126,15 @@
     const ctx  = data.congestion_context || {};
     const inc  = data.incident_context   || {};
     const cong = ctx.congestion_level || 'Low';
+    const condition = inc.condition || 'clear';
+    const affected = inc.affected_segments ?? 0;
+
+    // Displayed route scenario banner in result panel
+    const resScenName = document.getElementById('result-scenario-name');
+    if (resScenName) {
+      resScenName.innerHTML = `<span>${inc.label || inc.scenario}</span> `
+        + `<span style="color:#fbbf24;font-weight:600;font-size:0.72rem;">(${affected} affected segments)</span>`;
+    }
 
     // Badge
     document.getElementById('congestion-badge-container').innerHTML =
@@ -992,11 +1148,9 @@
       <div class="stat-card"><div class="val">${distKm}</div><div class="lbl">km</div></div>
       <div class="stat-card"><div class="val">${eta}</div><div class="lbl">min ETA</div></div>
       <div class="stat-card"><div class="val">${nodes}</div><div class="lbl">waypoints</div></div>
-      <div class="stat-card"><div class="val">${data.algorithm?.replace('_python_fallback','')?.toUpperCase()}</div>
-        <div class="lbl">algorithm</div></div>`;
+      <div class="stat-card"><div class="val">${affected}</div><div class="lbl">affected segments</div></div>`;
 
     // Incident panel
-    const condition = inc.condition || 'clear';
     const incPanel  = document.getElementById('incident-panel');
     const incHeader = document.getElementById('incident-header');
     const incBody   = document.getElementById('incident-body');
@@ -1017,11 +1171,13 @@
     incPanel.style.display = 'block';
     incPanel.className = `incident-panel ${condClass}`;
 
-    incHeader.textContent = `${condIcon} ${inc.label || 'Normal conditions'}`;
+    incHeader.textContent = `${condIcon} ${inc.label || 'Normal conditions'} (${affected} affected segments)`;
     incBody.innerHTML = `
+      <div class="row"><span class="key">Incident label</span><span class="val">${inc.label || 'Normal conditions'}</span></div>
       <div class="row"><span class="key">Condition</span><span class="val">${condition}</span></div>
-      <div class="row"><span class="key">Affected segments</span><span class="val">${inc.affected_segments ?? 0}</span></div>
+      <div class="row"><span class="key">Affected segments</span><span class="val">${affected} segments</span></div>
       <div class="row"><span class="key">Route profile</span><span class="val">${inc.priority || 'standard'}</span></div>
+      <div class="row"><span class="key">Applied scenario</span><span class="val">${inc.scenario || 'normal'}</span></div>
       ${inc.emergency_high_congestion_segments > 0
         ? `<div class="row"><span class="key">High-congestion rerouted</span>
            <span class="val">${inc.emergency_high_congestion_segments} segments</span></div>` : ''}
@@ -1037,10 +1193,24 @@
 
   // ── Clear Route ───────────────────────────────────────────────────────────
   function clearRoute() {
+    activeRouteRequestId++;
+    if (activeRouteAbortController) {
+      try { activeRouteAbortController.abort(); } catch (e) {}
+      activeRouteAbortController = null;
+    }
+    const btn = document.getElementById('find-route-btn');
+    if (btn) btn.disabled = false;
+
     if (routeLayer) routeLayer.remove();
     if (markerSrc)  markerSrc.remove();
     if (markerDst)  markerDst.remove();
-    markerSrc = markerDst = null;
+    routeLayer = markerSrc = markerDst = null;
+    displayedRouteScenario = null;
+    const dispValEl = document.getElementById('displayed-scenario-val');
+    if (dispValEl) {
+      dispValEl.textContent = 'None (cleared)';
+    }
+
     document.getElementById('src-input').value = '';
     document.getElementById('dst-input').value = '';
     document.getElementById('result-panel').style.display = 'none';
