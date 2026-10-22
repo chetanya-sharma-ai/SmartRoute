@@ -3,7 +3,7 @@ uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
 
 # ML
-scikit-learn==1.8.0  # Keep serialized model artifacts version-compatible
+scikit-learn==1.9.1  # Keep serialized model artifacts version-compatible
 xgboost>=2.0.0
 joblib>=1.4.0
 

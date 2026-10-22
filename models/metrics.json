@@ -5,14 +5,14 @@
     "r2": 0.9524
   },
   "random_forest_classifier": {
-    "accuracy": 0.8852,
-    "f1_weighted": 0.8859,
+    "accuracy": 0.8854,
+    "f1_weighted": 0.886,
     "top_features": {
-      "hour": 0.811,
-      "day_of_week": 0.0688,
-      "is_weekend": 0.0622,
-      "road_length_m": 0.0188,
-      "weather_Clear": 0.0087
+      "hour": 0.8138,
+      "day_of_week": 0.0678,
+      "is_weekend": 0.0617,
+      "road_length_m": 0.0186,
+      "weather_Clear": 0.0093
     }
   }
 }

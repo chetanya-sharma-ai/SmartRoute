@@ -45,25 +45,49 @@ def test_route_rejects_src_equals_dst():
     assert r.status_code == 422
 
 
-def test_route_invalid_nodes():
+def test_route_invalid_node_id_zero_returns_422():
+    """Non-positive node IDs must be rejected by FastAPI schema validation with 422."""
     r = client.get("/route?src=0&dst=1")
-    # Either 404 (no path / nodes not found) or 503 (no graph) — both acceptable
-    assert r.status_code in (200, 404, 503)
+    assert r.status_code == 422
 
 
-def test_route_no_path_returns_404_with_tip():
+def test_route_unknown_node_returns_404_with_tip():
     """
-    Nodes that exist in the graph but have no connecting path should return 404
-    with a user-facing tip in the error detail.
+    Nodes not present in the graph must return exact 404 with an actionable tip.
+    Node 253179982 is in the graph; 999999999 is unknown.
     """
-    # Node 253179982 is in the graph. 999999999 is not — Python fallback returns no path.
     r = client.get("/route?src=253179982&dst=999999999")
-    # Could be 404 (no route) or 503 (graph error); either is acceptable without graph data
-    assert r.status_code in (404, 503, 200)
-    if r.status_code == 404:
-        detail = r.json().get("detail", {})
-        if isinstance(detail, dict):
-            assert "tip" in detail or "message" in detail
+    assert r.status_code == 404
+    detail = r.json().get("detail", {})
+    assert isinstance(detail, dict)
+    assert "tip" in detail
+    assert "999999999" in detail.get("message", "")
+
+
+def test_nearest_node_rejects_out_of_bounds_coords():
+    """Coordinates far outside the supported area must return 400 Bad Request."""
+    r = client.get("/nodes/nearest?lat=0.0&lon=0.0")
+    assert r.status_code == 400
+    detail = r.json().get("detail", {})
+    assert "outside the supported graph area" in detail.get("message", "")
+
+
+def test_congestion_rejects_negative_road_length():
+    """Negative road length must return 422."""
+    r = client.get("/congestion?from_node=1&to_node=2&hour=8&road_length=-10")
+    assert r.status_code == 422
+
+
+def test_congestion_rejects_unsupported_weather():
+    """Unsupported weather string must return 422."""
+    r = client.get("/congestion?from_node=1&to_node=2&hour=8&weather=Blizzard")
+    assert r.status_code == 422
+
+
+def test_simulate_rejects_invalid_day():
+    """Day of week outside 0-6 must return 422."""
+    r = client.get("/simulate?day=7")
+    assert r.status_code == 422
 
 
 def test_congestion_endpoint():
