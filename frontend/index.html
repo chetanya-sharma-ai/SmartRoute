@@ -121,12 +121,88 @@
     .btn-secondary:hover { border-color: #3b82f6; color: #e2e8f0; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
+    /* ── Map picker controls ─────────────────────────────────────── */
+    .picker-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .picker-btn {
+      padding: 7px 6px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #94a3b8;
+      font-size: 0.73rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .picker-btn:hover { border-color: #3b82f6; color: #e2e8f0; }
+    .picker-btn.active-src {
+      background: #14532d;
+      border-color: #22c55e;
+      color: #86efac;
+      box-shadow: 0 0 10px rgba(34,197,94,0.35);
+    }
+    .picker-btn.active-dst {
+      background: #7f1d1d;
+      border-color: #ef4444;
+      color: #fca5a5;
+      box-shadow: 0 0 10px rgba(239,68,68,0.35);
+    }
+    .picker-status {
+      font-size: 0.72rem;
+      padding: 6px 10px;
+      background: #1e3a5f;
+      border: 1px solid #3b82f6;
+      border-radius: 6px;
+      color: #93c5fd;
+      margin-bottom: 8px;
+      display: none;
+    }
+
+    /* ── Stale route warning banner ───────────────────────────────── */
+    .stale-banner {
+      background: #422006;
+      border: 1px solid #f59e0b;
+      color: #fef08a;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.74rem;
+      margin-bottom: 12px;
+      display: none;
+      line-height: 1.35;
+    }
+
+    /* ── Scenario info card ───────────────────────────────────────── */
+    .scenario-info-card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 0.74rem;
+    }
+    .scenario-info-title {
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 3px;
+    }
+    .scenario-info-detail {
+      color: #94a3b8;
+      font-size: 0.71rem;
+      line-height: 1.35;
+    }
+
     /* ── Scenario preset buttons ─────────────────────────────────── */
     .preset-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
     .preset-btn {
       padding: 7px 6px;
@@ -362,36 +438,58 @@
 
   <!-- Scenario presets -->
   <div class="section">
-    <h2>Demo Scenarios <span class="tip">(click to load)</span></h2>
+    <h2>Incident Scenarios <span class="tip">(select condition)</span></h2>
     <div class="preset-grid" id="preset-grid">
-      <button class="preset-btn" id="preset-normal"
-        onclick="loadPreset('normal')">🟢 Normal<br>conditions</button>
-      <button class="preset-btn" id="preset-road_closure"
-        onclick="loadPreset('road_closure')">🔴 Road<br>closure</button>
-      <button class="preset-btn" id="preset-flash_flood"
-        onclick="loadPreset('flash_flood')">🌊 Flash<br>flood</button>
-      <button class="preset-btn" id="preset-access_restriction"
-        onclick="loadPreset('access_restriction')">🚧 Access<br>restriction</button>
-      <button class="preset-btn" id="preset-congestion_spike"
-        onclick="loadPreset('congestion_spike')">🟠 Congestion<br>spike</button>
+      <button type="button" class="preset-btn active" id="preset-normal"
+        onclick="selectScenario('normal')">🟢 Normal<br>conditions</button>
+      <button type="button" class="preset-btn" id="preset-road_closure"
+        onclick="selectScenario('road_closure')">🔴 Road<br>closure</button>
+      <button type="button" class="preset-btn" id="preset-flash_flood"
+        onclick="selectScenario('flash_flood')">🌊 Flash<br>flood</button>
+      <button type="button" class="preset-btn" id="preset-access_restriction"
+        onclick="selectScenario('access_restriction')">🚧 Access<br>restriction</button>
+      <button type="button" class="preset-btn" id="preset-congestion_spike"
+        onclick="selectScenario('congestion_spike')">🟠 Congestion<br>spike</button>
     </div>
-    <p class="tip">Each preset loads verified node pairs and the matching scenario.
-      Road closure, flash flood, and access restriction mark named roads unavailable —
-      the router must find an alternate path.</p>
+
+    <!-- Active scenario summary card -->
+    <div class="scenario-info-card" id="scenario-info-card">
+      <div class="scenario-info-title" id="scenario-info-title">🟢 Normal conditions</div>
+      <div class="scenario-info-detail" id="scenario-info-detail">
+        Standard traffic flow across Indiranagar. Free-flow baseline route calculation with no incident blocks.
+      </div>
+    </div>
+
+    <!-- Separate action to load example trip -->
+    <button type="button" class="btn btn-secondary" id="load-example-btn" onclick="loadExampleTrip()">
+      📍 Load Verified Example Trip
+    </button>
+    <p class="tip">Selecting a scenario applies to your active trip points. Loading an example trip sets verified origin/destination nodes for demonstrating this scenario.</p>
   </div>
 
   <!-- Route section -->
   <div class="section">
     <h2>Route Planner</h2>
 
+    <!-- Explicit map picking controls -->
+    <div class="picker-grid">
+      <button type="button" class="picker-btn" id="pick-src-btn" onclick="togglePicker('src')">
+        🟢 Choose Source on Map
+      </button>
+      <button type="button" class="picker-btn" id="pick-dst-btn" onclick="togglePicker('dst')">
+        🔴 Choose Dest on Map
+      </button>
+    </div>
+    <div id="picker-status" class="picker-status"></div>
+
     <label>Source Node ID</label>
-    <input type="number" id="src-input" value="253179982" placeholder="e.g. 253179982" />
+    <input type="number" id="src-input" value="253179982" placeholder="e.g. 253179982" oninput="onInputChanged('src')" />
 
     <label>Destination Node ID</label>
-    <input type="number" id="dst-input" value="736207607" placeholder="e.g. 736207607" />
+    <input type="number" id="dst-input" value="736207607" placeholder="e.g. 736207607" oninput="onInputChanged('dst')" />
 
     <label>Algorithm</label>
-    <select id="algo-select">
+    <select id="algo-select" onchange="onConditionsChange()">
       <option value="astar">A* (Faster — recommended)</option>
       <option value="dijkstra">Dijkstra</option>
     </select>
@@ -400,7 +498,7 @@
       🗺 Find Safe Route
     </button>
     <button class="btn btn-secondary" onclick="clearRoute()">✕ Clear Route</button>
-    <p class="tip">💡 Click the map to pick nodes by location instead of ID.</p>
+    <p class="tip">💡 Use "Choose on Map" buttons to place points by clicking the map, even when IDs are filled.</p>
   </div>
 
   <!-- Time & Weather section -->
@@ -423,7 +521,7 @@
     </select>
 
     <label>Emergency Scenario <span class="tip">(simulated)</span></label>
-    <select id="scenario-select" onchange="onConditionsChange()">
+    <select id="scenario-select" onchange="onDropdownScenarioChange(this.value)">
       <option value="normal">Normal conditions</option>
       <option value="road_closure">Road closure — 100 Feet Road</option>
       <option value="flash_flood">Flash flood — Swamy Vivekananda Road</option>
@@ -432,12 +530,11 @@
     </select>
 
     <label>Route Profile</label>
-    <select id="priority-select">
+    <select id="priority-select" onchange="onConditionsChange()">
       <option value="standard">Standard</option>
       <option value="emergency">Emergency response</option>
     </select>
-    <p class="tip">Emergency profile adds extra cost to model-predicted high-congestion roads.
-      It does not grant signal priority or right-of-way.</p>
+    <p class="tip">Emergency profile adds 1.25× extra penalty on model-predicted high-congestion roads.</p>
   </div>
 
   <!-- Layers section -->
@@ -452,6 +549,9 @@
     </div>
   </div>
 
+  <!-- Stale warning banner -->
+  <div id="stale-banner" class="stale-banner"></div>
+
   <!-- Result panel -->
   <div id="result-panel">
     <h2 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
@@ -464,41 +564,92 @@
       <div class="incident-header" id="incident-header"></div>
       <div class="incident-body" id="incident-body"></div>
     </div>
-    <div id="congestion-desc" style="font-size:0.8rem;color:#94a3b8;
-         background:#0f172a;padding:10px;border-radius:8px;
-         border:1px solid #1e293b;margin-top:8px;"></div>
+    <p id="congestion-desc" style="font-size:0.75rem;color:#64748b;margin-top:8px;"></p>
   </div>
 </aside>
 
-<!-- ── Map ────────────────────────────────────────────────────────────────── -->
+<!-- Map container -->
 <div id="map"></div>
 
 <script>
-  // ── Config ─────────────────────────────────────────────────────────────────
-  // When served by FastAPI (/app), the API is at the same origin.
-  // When opened as a local file (file://), fall back to localhost:8000.
-  const API_BASE = (window.location.protocol === 'file:')
-    ? 'http://localhost:8000'
-    : window.location.origin;
-  const DEFAULT_CENTER = [12.9811, 77.6438]; // Indiranagar, Bangalore
+  const API_BASE = '';
+  const DEFAULT_CENTER = [12.9784, 77.6408];
   const DEFAULT_ZOOM   = 14;
 
   // ── Scenario presets ── verified node pairs for each demo scenario ──────────
   // Each pair is confirmed reachable in the bundled Indiranagar graph.
-  // Closure/flood/restriction pairs are chosen so the named road lies on the
-  // direct path, forcing the router onto an alternate route.
+  // Road closure, flood, and access restriction pairs are chosen so the named road
+  // lies on the primary path, forcing the router onto an alternate route.
+  // Congestion spike uses an origin/destination that diverts to an alternate
+  // corridor when 80 Feet Road is spiked with a 2.5× multiplier.
   const PRESETS = {
-    normal:              { src: 253179982,  dst: 736207607,   priority: 'standard'  },
-    road_closure:        { src: 253179982,  dst: 736207607,   priority: 'standard'  },
-    flash_flood:         { src: 253179982,  dst: 12692472176, priority: 'standard'  },
-    access_restriction:  { src: 253179991,  dst: 4202336813,  priority: 'emergency' },
-    congestion_spike:    { src: 253179982,  dst: 1563306444,  priority: 'emergency' },
+    normal: {
+      src: 253179982,  dst: 736207607,
+      srcLat: 12.9812376, srcLon: 77.6460148,
+      dstLat: 12.9829234, dstLon: 77.6405761,
+      priority: 'standard'
+    },
+    road_closure: {
+      src: 253179982,  dst: 736207607,
+      srcLat: 12.9812376, srcLon: 77.6460148,
+      dstLat: 12.9829234, dstLon: 77.6405761,
+      priority: 'standard'
+    },
+    flash_flood: {
+      src: 253179982,  dst: 12692472176,
+      srcLat: 12.9812376, srcLon: 77.6460148,
+      dstLat: 12.9840371, dstLon: 77.6405308,
+      priority: 'standard'
+    },
+    access_restriction: {
+      src: 253179991,  dst: 4202336813,
+      srcLat: 12.9709660, srcLon: 77.6473157,
+      dstLat: 12.9708713, dstLon: 77.6436867,
+      priority: 'emergency'
+    },
+    congestion_spike: {
+      src: 421262977,  dst: 253179982,
+      srcLat: 12.9758272, srcLon: 77.6467377,
+      dstLat: 12.9812376, dstLon: 77.6460148,
+      priority: 'emergency'
+    },
+  };
+
+  const SCENARIO_INFO = {
+    normal: {
+      name: '🟢 Normal conditions',
+      target: 'None',
+      detail: 'Standard traffic flow across Indiranagar. Free-flow baseline route calculation with no incident blocks.'
+    },
+    road_closure: {
+      name: '🔴 Road closure',
+      target: '100 Feet Road',
+      detail: '100 Feet Road segments are set to weight = -1 (strictly impassable). Router must navigate via parallel avenues.'
+    },
+    flash_flood: {
+      name: '🌊 Flash flood',
+      target: 'Swamy Vivekananda Road',
+      detail: 'Simulated waterlogging along Swamy Vivekananda Road. Corridors are marked impassable (weight = -1).'
+    },
+    access_restriction: {
+      name: '🚧 Access restriction',
+      target: '11th Main Road',
+      detail: 'Emergency access restriction applied to 11th Main Road (weight = -1) to keep narrow corridors clear.'
+    },
+    congestion_spike: {
+      name: '🟠 Congestion spike',
+      target: '80 Feet Road',
+      detail: 'Simulated 2.5× congestion multiplier applied to 80 Feet Road. Router diverts around bottlenecks when viable competitive paths exist.'
+    }
   };
 
   // ── State ──────────────────────────────────────────────────────────────────
   let map, routeLayer, heatmapLayer, markerSrc, markerDst;
   let currentHour = 8;
   let currentWeather = 'Clear';
+  let currentScenario = 'normal';
+  let activePicker = null; // 'src' | 'dst' | null
+  let isRouteStale = false;
 
   // ── Leaflet init ──────────────────────────────────────────────────────────
   map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
@@ -521,41 +672,133 @@
   };
   legend.addTo(map);
 
-  // ── Preset loader ─────────────────────────────────────────────────────────
-  function loadPreset(scenarioKey) {
-    const p = PRESETS[scenarioKey];
-    if (!p) return;
-    document.getElementById('src-input').value = p.src;
-    document.getElementById('dst-input').value = p.dst;
+  // ── Scenario selection & Example Trip Loader ───────────────────────────────
+  function selectScenario(scenarioKey) {
+    if (!SCENARIO_INFO[scenarioKey]) return;
+    currentScenario = scenarioKey;
     document.getElementById('scenario-select').value = scenarioKey;
-    document.getElementById('priority-select').value = p.priority;
 
     // Highlight active preset button
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById('preset-' + scenarioKey);
     if (btn) btn.classList.add('active');
 
-    setStatus(`Preset loaded: ${scenarioKey.replace(/_/g,' ')}. Click "Find Safe Route".`);
+    // Update scenario info card
+    const info = SCENARIO_INFO[scenarioKey];
+    document.getElementById('scenario-info-title').textContent = info.name;
+    document.getElementById('scenario-info-detail').textContent =
+      `${info.detail} (Target road: ${info.target})`;
+
+    markRouteStale(`Scenario switched to "${info.name}". Source & destination preserved.`);
+    setStatus(`Active scenario: ${info.name}. Click "Find Safe Route" to compute with current trip points.`);
   }
 
-  // ── Click to pick nodes ───────────────────────────────────────────────────
+  function onDropdownScenarioChange(val) {
+    selectScenario(val);
+  }
+
+  function loadExampleTrip() {
+    const p = PRESETS[currentScenario];
+    if (!p) return;
+    document.getElementById('src-input').value = p.src;
+    document.getElementById('dst-input').value = p.dst;
+    document.getElementById('priority-select').value = p.priority;
+
+    placeMarker('src', p.srcLat, p.srcLon, p.src);
+    placeMarker('dst', p.dstLat, p.dstLon, p.dst);
+
+    map.fitBounds([[p.srcLat, p.srcLon], [p.dstLat, p.dstLon]], { padding: [60, 60] });
+
+    markRouteStale(`Loaded verified example trip for ${SCENARIO_INFO[currentScenario].name}: ${p.src} → ${p.dst}.`);
+    setStatus(`✅ Loaded example trip (${p.src} → ${p.dst}) for ${SCENARIO_INFO[currentScenario].name}. Click "Find Safe Route".`, 'success');
+  }
+
+  // ── Explicit Map Picker Controls ──────────────────────────────────────────
+  function togglePicker(type) {
+    if (activePicker === type) {
+      activePicker = null;
+    } else {
+      activePicker = type;
+    }
+    updatePickerUI();
+  }
+
+  function updatePickerUI() {
+    const srcBtn = document.getElementById('pick-src-btn');
+    const dstBtn = document.getElementById('pick-dst-btn');
+    const statusEl = document.getElementById('picker-status');
+
+    srcBtn.classList.remove('active-src');
+    dstBtn.classList.remove('active-dst');
+
+    if (activePicker === 'src') {
+      srcBtn.classList.add('active-src');
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = '👉 <strong>Click anywhere on the map</strong> to set Source node.';
+    } else if (activePicker === 'dst') {
+      dstBtn.classList.add('active-dst');
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = '👉 <strong>Click anywhere on the map</strong> to set Destination node.';
+    } else {
+      statusEl.style.display = 'none';
+      statusEl.innerHTML = '';
+    }
+  }
+
+  // ── Click to pick nodes on map ─────────────────────────────────────────────
   map.on('click', async (e) => {
     const { lat, lng } = e.latlng;
+    setStatus('Looking up nearest road network node…', 'loading');
     const res = await apiFetch(`/nodes/nearest?lat=${lat}&lon=${lng}`);
-    if (!res || res.error) return;
 
-    if (!document.getElementById('src-input').value) {
+    if (!res || res.error || res.detail) {
+      const err = res?.error || res?.detail?.message || 'Selected location is outside the Indiranagar graph area.';
+      setStatus(`⚠️ ${err}`, 'error');
+      return;
+    }
+
+    if (activePicker === 'src') {
       document.getElementById('src-input').value = res.node_id;
       placeMarker('src', res.lat, res.lon, res.node_id);
-    } else if (!document.getElementById('dst-input').value) {
+      activePicker = null;
+      updatePickerUI();
+      markRouteStale(`Source node set to ${res.node_id}.`);
+      setStatus(`🟢 Source set to node ${res.node_id}.`, 'success');
+    } else if (activePicker === 'dst') {
       document.getElementById('dst-input').value = res.node_id;
       placeMarker('dst', res.lat, res.lon, res.node_id);
+      activePicker = null;
+      updatePickerUI();
+      markRouteStale(`Destination node set to ${res.node_id}.`);
+      setStatus(`🔴 Destination set to node ${res.node_id}.`, 'success');
+    } else {
+      // Direct click when no explicit picker is toggled
+      const srcVal = document.getElementById('src-input').value.trim();
+      const dstVal = document.getElementById('dst-input').value.trim();
+
+      if (!srcVal) {
+        document.getElementById('src-input').value = res.node_id;
+        placeMarker('src', res.lat, res.lon, res.node_id);
+        markRouteStale(`Source node set to ${res.node_id}.`);
+        setStatus(`🟢 Source set to node ${res.node_id}. Click map again to pick destination.`, 'success');
+      } else if (!dstVal) {
+        document.getElementById('dst-input').value = res.node_id;
+        placeMarker('dst', res.lat, res.lon, res.node_id);
+        markRouteStale(`Destination node set to ${res.node_id}.`);
+        setStatus(`🔴 Destination set to node ${res.node_id}. Click "Find Safe Route".`, 'success');
+      } else {
+        // Both fields filled: update destination by default and notify presenter
+        document.getElementById('dst-input').value = res.node_id;
+        placeMarker('dst', res.lat, res.lon, res.node_id);
+        markRouteStale(`Destination updated to node ${res.node_id}.`);
+        setStatus(`🔴 Destination updated to node ${res.node_id}. Use "Choose Source on Map" to update source.`, 'success');
+      }
     }
   });
 
   function placeMarker(type, lat, lon, nodeId) {
     const color = type === 'src' ? '#22c55e' : '#ef4444';
-    const label = type === 'src' ? '🟢 Source' : '🔴 Dest';
+    const label = type === 'src' ? '🟢 Source' : '🔴 Destination';
     const icon = L.divIcon({
       html: `<div style="background:${color};width:16px;height:16px;
                 border-radius:50%;border:3px solid white;box-shadow:0 0 6px ${color}"></div>`,
@@ -564,11 +807,41 @@
     if (type === 'src') {
       if (markerSrc) markerSrc.remove();
       markerSrc = L.marker([lat, lon], { icon }).addTo(map)
-                   .bindPopup(`<b>${label}</b><br>Node: ${nodeId}`);
+                   .bindPopup(`<b>${label}</b><br>Node ID: ${nodeId}`);
     } else {
       if (markerDst) markerDst.remove();
       markerDst = L.marker([lat, lon], { icon }).addTo(map)
-                   .bindPopup(`<b>${label}</b><br>Node: ${nodeId}`);
+                   .bindPopup(`<b>${label}</b><br>Node ID: ${nodeId}`);
+    }
+  }
+
+  // ── Input synchronization & Stale State ────────────────────────────────────
+  function onInputChanged(type) {
+    markRouteStale(`Node ID manually updated.`);
+  }
+
+  function markRouteStale(reason) {
+    isRouteStale = true;
+    const banner = document.getElementById('stale-banner');
+    if (banner) {
+      banner.style.display = 'block';
+      banner.innerHTML = `⚠️ <strong>Route stale:</strong> ${reason || 'Parameters changed.'} Click <strong>Find Safe Route</strong> to recalculate.`;
+    }
+    if (routeLayer) {
+      routeLayer.eachLayer(layer => {
+        if (layer.setStyle) {
+          layer.setStyle({ color: '#64748b', opacity: 0.35, dashArray: '4, 8' });
+        }
+      });
+    }
+  }
+
+  function clearRouteStale() {
+    isRouteStale = false;
+    const banner = document.getElementById('stale-banner');
+    if (banner) {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
     }
   }
 
@@ -578,7 +851,7 @@
       const r = await fetch(API_BASE + path);
       if (!r.ok) {
         let detail = r.statusText;
-        try { const j = await r.json(); detail = j.message || j.detail || detail; } catch {}
+        try { const j = await r.json(); detail = j.detail || j.message || detail; } catch {}
         return { error: detail, status: r.status };
       }
       return await r.json();
@@ -605,6 +878,7 @@
 
   function onConditionsChange() {
     currentWeather = document.getElementById('weather-select').value;
+    markRouteStale('Traffic conditions updated.');
     if (document.getElementById('heatmap-toggle').checked) {
       loadHeatmap();
     }
@@ -627,41 +901,46 @@
       return;
     }
 
-    document.getElementById('find-route-btn').disabled = true;
-    setStatus(`Computing route with ${algo.toUpperCase()}…`, 'loading');
+    const btn = document.getElementById('find-route-btn');
+    btn.disabled = true;
+    setStatus(`Computing safe route with ${algo.toUpperCase()}…`, 'loading');
 
-    const url = `/route?src=${src}&dst=${dst}&hour=${currentHour}`
-              + `&weather=${currentWeather}&algo=${algo}`
-              + `&scenario=${scenario}&priority=${priority}`;
-    const data = await apiFetch(url);
+    try {
+      const url = `/route?src=${encodeURIComponent(src)}&dst=${encodeURIComponent(dst)}&hour=${currentHour}`
+                + `&weather=${encodeURIComponent(currentWeather)}&algo=${encodeURIComponent(algo)}`
+                + `&scenario=${encodeURIComponent(scenario)}&priority=${encodeURIComponent(priority)}`;
+      const data = await apiFetch(url);
 
-    document.getElementById('find-route-btn').disabled = false;
+      if (!data || data.error) {
+        const msg = data?.error || 'Failed to get route';
+        const tip = data?.tip
+          ? `<br><span style="color:#cbd5e1;font-size:0.75rem">${data.tip}</span>`
+          : '';
+        setStatus(`❌ ${msg}${tip}`, 'error');
+        document.getElementById('result-panel').style.display = 'none';
+        return;
+      }
+      if (data.detail) {
+        const msg = typeof data.detail === 'object'
+          ? (data.detail.message || JSON.stringify(data.detail))
+          : data.detail;
+        const tip = typeof data.detail === 'object' && data.detail.tip
+          ? `<br><span style="color:#cbd5e1;font-size:0.75rem">${data.detail.tip}</span>`
+          : '';
+        setStatus(`❌ ${msg}${tip}`, 'error');
+        document.getElementById('result-panel').style.display = 'none';
+        return;
+      }
 
-    if (!data || data.error) {
-      const msg = data?.error || 'Failed to get route';
-      const tip = data?.tip
-        ? `<br><span style="color:#64748b;font-size:0.72rem">${data.tip}</span>`
-        : '';
-      setStatus(`❌ ${msg}${tip}`, 'error');
-      document.getElementById('result-panel').style.display = 'none';
-      return;
+      clearRouteStale();
+      drawRoute(data);
+      showResults(data);
+      setStatus(`✅ Safe route found via ${data.algorithm} — ${data.incident_context?.label || 'Normal conditions'}`, 'success');
+    } catch (err) {
+      setStatus(`❌ Network error: ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
     }
-    if (data.detail) {
-      // FastAPI validation error or no-route dict
-      const msg = typeof data.detail === 'object'
-        ? (data.detail.message || JSON.stringify(data.detail))
-        : data.detail;
-      const tip = typeof data.detail === 'object' && data.detail.tip
-        ? `<br><span style="color:#64748b;font-size:0.72rem">${data.detail.tip}</span>`
-        : '';
-      setStatus(`❌ ${msg}${tip}`, 'error');
-      document.getElementById('result-panel').style.display = 'none';
-      return;
-    }
-
-    drawRoute(data);
-    showResults(data);
-    setStatus(`✅ Route found via ${data.algorithm} — ${data.incident_context?.label || 'Normal conditions'}`, 'success');
   }
 
   // ── Draw Route on Map ─────────────────────────────────────────────────────
@@ -748,6 +1027,7 @@
            <span class="val">${inc.emergency_high_congestion_segments} segments</span></div>` : ''}
       <div class="row"><span class="key">Data source</span>
         <span class="val" style="color:#f59e0b;font-size:0.72rem">⚠️ SIMULATED</span></div>
+      <div class="sim-note">Note: A route changes only when an incident impacts a competitive path. If no viable alternative exists, cost and ETA increase without diversion.</div>
     `;
 
     // Congestion description
@@ -764,8 +1044,10 @@
     document.getElementById('src-input').value = '';
     document.getElementById('dst-input').value = '';
     document.getElementById('result-panel').style.display = 'none';
-    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-    setStatus('Route cleared. Select a scenario or enter node IDs.');
+    clearRouteStale();
+    activePicker = null;
+    updatePickerUI();
+    setStatus('Route cleared. Enter node IDs or pick points on map.');
   }
 
   // ── Heatmap ───────────────────────────────────────────────────────────────
@@ -780,10 +1062,10 @@
 
   async function loadHeatmap() {
     if (heatmapLayer) heatmapLayer.remove();
-    setStatus('Loading traffic heatmap…', 'loading');
+    setStatus('Loading simulated traffic heatmap…', 'loading');
 
     const day = new Date().getDay();
-    const url = `/heatmap?hour=${currentHour}&weather=${currentWeather}&day=${day}`;
+    const url = `/heatmap?hour=${currentHour}&weather=${encodeURIComponent(currentWeather)}&day=${day}`;
     const data = await apiFetch(url);
 
     if (!data || !data.features) {
@@ -808,13 +1090,16 @@
     setStatus(`✅ Heatmap loaded (${data.features.length} segments, simulated)`, 'success');
   }
 
-  // ── Init: fetch graph summary to center map ────────────────────────────────
+  // ── Init: setup default state and markers ──────────────────────────────────
   (async () => {
     const summary = await apiFetch('/graph/summary');
     if (summary && summary.center_lat) {
       map.setView([summary.center_lat, summary.center_lon], 14);
     }
-    // Auto-highlight the normal preset on load
+    // Place initial markers for default points
+    const defaultNormal = PRESETS.normal;
+    placeMarker('src', defaultNormal.srcLat, defaultNormal.srcLon, defaultNormal.src);
+    placeMarker('dst', defaultNormal.dstLat, defaultNormal.dstLon, defaultNormal.dst);
     document.getElementById('preset-normal').classList.add('active');
   })();
 </script>

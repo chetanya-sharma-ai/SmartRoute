@@ -6,6 +6,7 @@ Tests for route safety, alternate-route selection, validation, and error cases.
 import json
 import os
 import sys
+from itertools import pairwise
 
 import pytest
 
@@ -13,7 +14,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from api.engine_runner import run_cpp_engine
 from api.route_scenarios import create_route_weights
-
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -243,7 +243,8 @@ def test_malformed_edges_are_skipped_gracefully(tmp_path, monkeypatch):
 
     weights_path, ctx = create_route_weights(str(graph_path), None, "normal", "standard")
     try:
-        weights = json.loads(open(weights_path, encoding="utf-8").read())
+        with open(weights_path, encoding="utf-8") as weights_file:
+            weights = json.load(weights_file)
     finally:
         os.remove(weights_path)
 
@@ -276,7 +277,8 @@ def test_emergency_profile_increases_high_congestion_cost(tmp_path, monkeypatch)
         str(graph_path), str(base_path), "normal", "emergency"
     )
     try:
-        weights = json.loads(open(weights_path, encoding="utf-8").read())
+        with open(weights_path, encoding="utf-8") as weights_file:
+            weights = json.load(weights_file)
     finally:
         os.remove(weights_path)
 
@@ -305,7 +307,8 @@ def test_emergency_does_not_affect_low_congestion_edges(tmp_path, monkeypatch):
         str(graph_path), str(base_path), "normal", "emergency"
     )
     try:
-        weights = json.loads(open(weights_path, encoding="utf-8").read())
+        with open(weights_path, encoding="utf-8") as weights_file:
+            weights = json.load(weights_file)
     finally:
         os.remove(weights_path)
 
@@ -338,7 +341,8 @@ def test_simulated_congestion_spike_increases_named_road_cost(tmp_path, monkeypa
         str(graph_path), str(base_path), "congestion_spike", "standard"
     )
     try:
-        weights = json.loads(open(weights_path, encoding="utf-8").read())
+        with open(weights_path, encoding="utf-8") as weights_file:
+            weights = json.load(weights_file)
     finally:
         os.remove(weights_path)
 
@@ -413,3 +417,156 @@ def test_incident_context_always_reports_simulated_source(tmp_path, monkeypatch)
         os.remove(weights_path)
         assert "simulated" in ctx["data_source"].lower(), \
             f"data_source must mention 'simulated', got: {ctx['data_source']}"
+
+
+# ── Real Graph Integration Tests ──────────────────────────────────────────────
+
+REAL_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+REAL_GRAPH = os.path.join(REAL_DATA_DIR, "graph_data.json")
+REAL_WEIGHTS = os.path.join(REAL_DATA_DIR, "edge_weights.json")
+
+
+def _get_path_edge_names(path_nodes, graph_data):
+    """Map sequential nodes in path to road names in the graph."""
+    edge_map = {}
+    for edge in graph_data.get("edges", []):
+        edge_map[(edge["from"], edge["to"])] = edge.get("name")
+    names = []
+    for u, v in pairwise(path_nodes):
+        names.append(edge_map.get((u, v)) or "")
+    return names
+
+
+def test_real_graph_all_scenarios_and_algorithms():
+    """Verify all real scenarios routing on the bundled Indiranagar graph."""
+    if not os.path.exists(REAL_GRAPH):
+        pytest.skip("graph_data.json not found")
+
+    with open(REAL_GRAPH, "r", encoding="utf-8") as f:
+        graph_data = json.load(f)
+
+    # 1. Normal (standard pair)
+    src_norm = 253179982
+    dst_norm = 736207607
+    w_norm, ctx_norm = create_route_weights(REAL_GRAPH, REAL_WEIGHTS, "normal", "standard")
+    try:
+        res_astar = run_cpp_engine(REAL_GRAPH, src_norm, dst_norm, w_norm, "astar")
+        res_dijkstra = run_cpp_engine(REAL_GRAPH, src_norm, dst_norm, w_norm, "dijkstra")
+        assert "error" not in res_astar, res_astar
+        assert "error" not in res_dijkstra, res_dijkstra
+        assert ctx_norm["affected_segments"] == 0
+        assert len(res_astar["path"]) >= 2
+        assert len(res_dijkstra["path"]) >= 2
+    finally:
+        os.remove(w_norm)
+
+    # 2. Road Closure (100 Feet Road)
+    w_close, ctx_close = create_route_weights(REAL_GRAPH, REAL_WEIGHTS, "road_closure", "standard")
+    try:
+        res_close = run_cpp_engine(REAL_GRAPH, src_norm, dst_norm, w_close, "astar")
+        assert "error" not in res_close, res_close
+        assert ctx_close["affected_segments"] > 0
+        path_nodes = [n["id"] for n in res_close["path"]]
+        edge_names = _get_path_edge_names(path_nodes, graph_data)
+        assert not any("100 Feet Road" in (name or "") for name in edge_names)
+    finally:
+        os.remove(w_close)
+
+    # 3. Flash Flood (Swamy Vivekananda Road)
+    src_flood = 253179982
+    dst_flood = 12692472176
+    w_flood, ctx_flood = create_route_weights(REAL_GRAPH, REAL_WEIGHTS, "flash_flood", "standard")
+    try:
+        res_flood = run_cpp_engine(REAL_GRAPH, src_flood, dst_flood, w_flood, "astar")
+        assert "error" not in res_flood, res_flood
+        assert ctx_flood["affected_segments"] > 0
+        path_nodes = [n["id"] for n in res_flood["path"]]
+        edge_names = _get_path_edge_names(path_nodes, graph_data)
+        assert not any("Swamy Vivekananda Road" in (name or "") for name in edge_names)
+    finally:
+        os.remove(w_flood)
+
+    # 4. Access Restriction (11th Main Road)
+    src_access = 253179991
+    dst_access = 4202336813
+    w_access, ctx_access = create_route_weights(REAL_GRAPH, REAL_WEIGHTS, "access_restriction", "emergency")
+    try:
+        res_access = run_cpp_engine(REAL_GRAPH, src_access, dst_access, w_access, "astar")
+        assert "error" not in res_access, res_access
+        assert ctx_access["affected_segments"] > 0
+        path_nodes = [n["id"] for n in res_access["path"]]
+        edge_names = _get_path_edge_names(path_nodes, graph_data)
+        assert not any("11th Main Road" in (name or "") for name in edge_names)
+    finally:
+        os.remove(w_access)
+
+
+def test_real_graph_congestion_spike_diverts_route():
+    """Verify that a 2.5x congestion spike on 80 Feet Road causes route 421262977 -> 253179982 to divert."""
+    if not os.path.exists(REAL_GRAPH):
+        pytest.skip("graph_data.json not found")
+
+    with open(REAL_GRAPH, "r", encoding="utf-8") as f:
+        graph_data = json.load(f)
+
+    src = 421262977
+    dst = 253179982
+
+    w_norm, _ = create_route_weights(REAL_GRAPH, REAL_WEIGHTS, "normal", "standard")
+    w_spike, ctx_spike = create_route_weights(REAL_GRAPH, REAL_WEIGHTS, "congestion_spike", "standard")
+    try:
+        res_norm = run_cpp_engine(REAL_GRAPH, src, dst, w_norm, "astar")
+        res_spike = run_cpp_engine(REAL_GRAPH, src, dst, w_spike, "astar")
+        assert "error" not in res_norm, res_norm
+        assert "error" not in res_spike, res_spike
+        assert ctx_spike["affected_segments"] > 0
+
+        path_norm = [n["id"] for n in res_norm["path"]]
+        path_spike = [n["id"] for n in res_spike["path"]]
+
+        norm_names = _get_path_edge_names(path_norm, graph_data)
+        spike_names = _get_path_edge_names(path_spike, graph_data)
+
+        # Normal route runs along 80 Feet Road (8 segments)
+        norm_80ft = sum(1 for name in norm_names if "80 Feet Road" in (name or ""))
+        assert norm_80ft == 8
+
+        # Spiked route diverts onto side streets (3rd Main, 6th Cross, 1st Main, etc.)
+        spike_80ft = sum(1 for name in spike_names if "80 Feet Road" in (name or ""))
+        assert spike_80ft == 1  # Only final connection to destination node
+
+        # Travel time under spike on the diverted route is higher than unspiked route
+        assert res_spike["total_time_s"] > res_norm["total_time_s"]
+        assert path_norm != path_spike
+    finally:
+        os.remove(w_norm)
+        os.remove(w_spike)
+
+
+def test_real_graph_python_fallback(monkeypatch):
+    """Verify python fallback cleanly handles both astar and dijkstra on real graph."""
+    if not os.path.exists(REAL_GRAPH):
+        pytest.skip("graph_data.json not found")
+
+    from api import engine_runner
+    monkeypatch.setattr(engine_runner, "find_binary", lambda: None)
+
+    src = 253179982
+    dst = 736207607
+
+    w_norm, _ = create_route_weights(REAL_GRAPH, REAL_WEIGHTS, "normal", "standard")
+    try:
+        res_astar = run_cpp_engine(REAL_GRAPH, src, dst, w_norm, "astar")
+        res_dijkstra = run_cpp_engine(REAL_GRAPH, src, dst, w_norm, "dijkstra")
+
+        assert "error" not in res_astar, res_astar
+        assert "error" not in res_dijkstra, res_dijkstra
+        assert res_astar["algorithm"] == "astar_python_fallback"
+        assert res_dijkstra["algorithm"] == "dijkstra_python_fallback"
+        assert len(res_astar["path"]) >= 2
+        assert len(res_dijkstra["path"]) >= 2
+        assert res_astar["total_distance_m"] > 0
+        assert res_dijkstra["total_distance_m"] > 0
+    finally:
+        os.remove(w_norm)
+

@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/RandomForest-88.5%25_synthetic-green" alt="RandomForest">
   <img src="https://img.shields.io/badge/Leaflet.js-Map-4CAF50?logo=leaflet" alt="Leaflet">
-  <img src="https://img.shields.io/badge/Tests-33_passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-40_passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/Docker-Multi--stage-2496ED?logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Data-Simulated-yellow" alt="Simulated">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT">
@@ -44,10 +44,10 @@
 | Capability | Technical Mechanism | Emergency Impact |
 |---|---|---|
 | 🔴 **Blocked Roads** | Marked edges receive `time_weight = -1`; strictly pruned before graph traversal | Guarantees emergency vehicles never encounter closed construction or disaster zones |
-| 🌊 **Flooded Corridors** | Dynamically marks submerged streets impassable based on weather & flood warnings | Prevents vehicle stall in low-lying waterlogged roads |
-| 🚧 **Access Restrictions** | Excludes narrow or vehicle-incompatible road classes | Ensures heavy emergency vehicles stick to cleared, wide arterials |
-| 🟠 **Congestion Avoidance** | Applies a dynamic cost penalty (2.5×–3.5× multiplier) to spiked corridors | A* automatically redirects around bottlenecks via clearer side streets |
-| 🚑 **Emergency Priority Mode** | Applies additional 2.0× penalty to High-congestion links; prioritizes flow stability | Avoids gridlock even if the alternate route is slightly longer in meters |
+| 🌊 **Flooded Corridors** | Dynamically marks submerged streets impassable (`time_weight = -1`) | Prevents vehicle stall in low-lying waterlogged roads (e.g. Swamy Vivekananda Road) |
+| 🚧 **Access Restrictions** | Excludes narrow or vehicle-incompatible road classes (`time_weight = -1`) | Ensures heavy emergency vehicles stick to cleared, wide arterials |
+| 🟠 **Congestion Avoidance** | Applies a dynamic cost penalty (2.5× multiplier) to spiked corridors | A* automatically redirects around bottlenecks via clearer side streets |
+| 🚑 **Emergency Priority Mode** | Applies an additional 1.25× multiplier to High-congestion segments | Minimizes risk of severe delay in gridlock when time is life-critical |
 | 🤖 **Predictive ML Congestion** | Random Forest predicts Low/Medium/High traffic from hour, weather, and road length | Anticipates bottlenecks before vehicles arrive at intersections |
 | 🔥 **Dynamic Traffic Heatmap** | Computes network-wide edge delays and visualizes via GeoJSON polylines | Real-time situational awareness for dispatchers |
 
@@ -96,8 +96,8 @@ This project purposefully uses a hybrid architecture designed to balance **raw a
 * **Judge Talking Point:** *"We chose zero-dependency Vanilla JS and Leaflet to ensure instant load times and zero client-side build complexity. It provides an immediate, responsive UI that works across desktop and mobile browsers."*
 
 ### 6. Testing & Quality Assurance: pytest + pytest-asyncio
-* **What it does:** Provides 33 automated tests covering API validation, routing invariants (proving blocked edges never appear in returned paths), disconnected graph handling, and ML prediction consistency.
-* **Judge Talking Point:** *"Reliability in an emergency system is non-negotiable. We built a 33-test automated regression suite that proves safety invariants—specifically that blocked roads are never traversed under any scenario."*
+* **What it does:** Provides 40 automated tests covering API validation, routing invariants (proving blocked edges never appear in returned paths), disconnected graph handling, and ML prediction consistency.
+* **Judge Talking Point:** *"Reliability in an emergency system is non-negotiable. We built a 40-test automated regression suite that proves safety invariants—specifically that blocked roads are never traversed under any scenario."*
 
 ### 7. Containerization: Docker (Multi-Stage Build)
 * **What it does:** Stage 1 uses `ubuntu:22.04` with CMake and `g++` to compile the C++ binary. Stage 2 copies the compiled binary into a slim `python:3.11-slim` runtime environment.
@@ -178,7 +178,7 @@ pip install -r requirements.txt
 ```
 
 ### Step 4: (Optional) Build the C++ Engine
-> *Note: Windows precompiled binary is included at `api/smartroute_engine.exe`. If you are on Linux or macOS, you can build it in 2 commands:*
+> *Note: Windows and Linux executables are not tracked in git (matching standard `.gitignore` best practice). If you have CMake and a C++17 compiler (MSVC on Windows, GCC/Clang on Linux/macOS), build the binary locally:*
 
 ```bash
 cd core
@@ -187,7 +187,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 cd ../..
 ```
-*If you skip this step, SmartRoute automatically falls back to its built-in Python routing engine with zero configuration.*
+*If you don't compile the binary, SmartRoute automatically and seamlessly uses its built-in Python fallback routing engine (`astar_python_fallback` / `dijkstra_python_fallback`) with zero configuration.*
 
 ### Step 5: Start the FastAPI Server
 ```bash
@@ -209,7 +209,7 @@ In a separate terminal (with `.venv` active):
 ```bash
 pytest tests/ -v
 ```
-Expected output: **`33 passed in ~7s`** (100% pass rate).
+Expected output: **`40 passed in ~9s`** (100% pass rate).
 
 ### Step 8: Run Algorithmic Benchmarks
 ```bash
@@ -298,49 +298,58 @@ Step 1: Open http://localhost:8000/app
         Point out the clean Indiranagar, Bangalore map loaded via Leaflet.js.
 
 Step 2: Click "🟢 Normal conditions" preset → Click "Find Safe Route"
-        → Baseline path: ~0.95 km, ~4.3 min ETA across 17 nodes.
+        (Source: 253179982, Destination: 736207607)
+        → Baseline path: ~0.95 km across 17 nodes.
         → Explain: "Under normal conditions, A* finds the direct arterial route along 100 Feet Road."
 
 Step 3: Click "🔴 Road closure" preset → Click "Find Safe Route"
-        → Rerouted path: ~1.47 km, ~6.6 min ETA across 24 nodes.
-        → Explain: "100 Feet Road is marked closed. SmartRoute completely pruned those segments.
-                    The C++ engine traversed side avenues, guaranteeing the blocked road is never entered."
+        (Source: 253179982, Destination: 736207607)
+        → Rerouted path: ~1.47 km across 24 nodes.
+        → Explain: "100 Feet Road is marked closed (-1 weight). SmartRoute completely prunes those
+                    segments, and the engine traverses side avenues with 0 edges on 100 Feet Road."
 
-Step 4: Click "🌊 Flash flood" preset → Click "Find Safe Route"
-        → Path shifts north/south, avoiding flooded low-lying corridors on Swamy Vivekananda Road.
+Step 4: Click "🌊 Flash flood" preset → Click "📍 Load Verified Example Trip" → "Find Safe Route"
+        (Source: 253179982, Destination: 12692472176)
+        → Path shifts north/south across 18 nodes, completely avoiding flooded low-lying corridors on Swamy Vivekananda Road.
         → Incident panel clearly displays: Condition: Flooded, Affected Segments: 16.
 
-Step 5: Click "🟠 Congestion spike" preset → Click "Find Safe Route"
-        → Notice how the route diverts around the 80 Feet Road arterial bottleneck.
-        → Explain: "Rather than forcing drivers through a 3.5× delay, the router takes a slightly longer
-                    geographic distance that saves significant travel time."
+Step 5: Click "🚧 Access restriction" preset → Click "📍 Load Verified Example Trip" → "Find Safe Route"
+        (Source: 253179991, Destination: 4202336813)
+        → Emergency route traverses 16 nodes, completely avoiding restricted 11th Main Road.
 
-Step 6: Toggle "🔥 Traffic Heatmap" checkbox & drag the Hour Slider
+Step 6: Click "🟠 Congestion spike" preset → Click "📍 Load Verified Example Trip" → "Find Safe Route"
+        (Source: 421262977, Destination: 253179982)
+        → Normal route uses 8 consecutive segments along 80 Feet Road (9 nodes).
+        → Congestion spike applies a 2.5× penalty to 80 Feet Road, causing the router to divert
+          onto 3rd Main Road, 6th Cross Road, and 1st Main Road (16 nodes), saving bottleneck delay.
+
+Step 7: Toggle "🔥 Traffic Heatmap" checkbox & drag the Hour Slider
         → The whole city grid updates color codes (Green = Low, Yellow = Medium, Red = High).
-        → Demonstrates 24-hour predictive ML capability.
+        → Demonstrates 24-hour predictive ML capability based on contextual time/weather models.
 ```
 
 ---
 
 ## 🧪 Test Suite & Invariants
 
-The project includes **33 automated tests** verified with `pytest`:
+The project includes **40 automated tests** verified with `pytest`:
 
 ```text
-======================== 33 passed in 6.97s ========================
+======================== 40 passed in 8.95s ========================
 ```
 
 | Category | Verified Behavior | Test Count |
 |---|---|:---:|
-| **API Parameter Validation** | Rejects missing inputs, validates types, enforces `src != dst` (422) | 5 |
-| **Path Failure Handling** | Returns 404 with actionable recovery tips when all corridors are blocked | 1 |
-| **Endpoint Smoke Tests** | Verifies `/health`, `/congestion`, `/heatmap`, `/simulate`, `/graph/summary` | 5 |
-| **ML Inference Correctness** | Validates Random Forest output labels, 24h simulation, and nearest node | 6 |
-| **Hazard Road Exclusion** | Proves blocked, flooded, and restricted roads are completely bypassed | 3 |
-| **Safety Invariant** | Asserts that 0% of blocked edges ever appear in the returned path | 1 |
+| **API Parameter Validation** | Rejects missing inputs, validates types, bounds, out-of-range coords, enforces `src != dst` (422/400) | 11 |
+| **Path Failure Handling** | Returns exact 404 with actionable recovery tips when nodes are missing or routes unreachable | 2 |
+| **Endpoint Smoke Tests** | Verifies `/health`, `/congestion`, `/heatmap`, `/simulate`, `/graph/summary` | 4 |
+| **ML Inference Correctness** | Validates Random Forest output labels, 24h simulation, nearest node, and rule fallback | 6 |
+| **Hazard Road Exclusion** | Proves blocked, flooded, and restricted roads are completely bypassed | 4 |
+| **Safety Invariants** | Asserts that 0% of blocked edges ever appear in the returned path | 2 |
 | **Topology Resilience** | Disconnected graph detection, invalid node ID handling, malformed edge skipping | 3 |
-| **Emergency Priority Tuning**| Proves high-congestion edge costs double under emergency vehicle profile | 2 |
-| **Congestion Routing** | Proves pathfinder picks alternates when named roads suffer traffic spikes | 2 |
+| **Emergency Priority Tuning**| Proves high-congestion edge costs receive 1.25× penalty under emergency profile | 2 |
+| **Congestion Routing** | Proves pathfinder picks alternates when named roads suffer 2.5× traffic spikes | 2 |
+| **Real Graph Integration** | Real graph scenario verification (all 5 scenarios), 80 Feet Rd diversion, and Python fallback | 3 |
 | **Data Attribution** | Verifies every response includes simulated data disclaimer | 1 |
 
 Run tests anytime with:
@@ -417,7 +426,7 @@ Be prepared to answer these questions with confidence:
 > **Answer:** *"SmartRoute enforces an absolute safety guarantee: it will never route a vehicle onto a closed or submerged road. If no safe route exists, the API returns HTTP 404 with an actionable diagnostic tip explaining that all corridors are blocked, alerting dispatchers to deploy alternative evacuation methods rather than leading drivers into danger."*
 
 #### Q4: "How does the Emergency Priority Profile differ from Standard routing?"
-> **Answer:** *"Standard navigation balances distance and average speed. In Emergency mode, our algorithm doubles the penalty on roads with predicted High congestion. Even if a side street is geographically longer, an ambulance avoids congested bottlenecks where getting stuck behind stopped traffic is catastrophic."*
+> **Answer:** *"Standard navigation balances distance and average speed. In Emergency mode, our algorithm adds an extra 1.25× multiplier on roads predicted as High congestion. Even if a side street is geographically longer, an emergency vehicle avoids bottleneck corridors where getting stuck behind stopped traffic is catastrophic."*
 
 #### Q5: "How does this scale to a full metropolitan city like Bangalore?"
 > **Answer:** *"Our prototype runs on a 322-node network of Indiranagar. For city-scale deployment (100,000+ nodes), we would implement Contraction Hierarchies (CH) or Customisable Contraction Hierarchies (CCH) in C++, which precompute shortcuts to enable sub-millisecond queries across entire countries."*

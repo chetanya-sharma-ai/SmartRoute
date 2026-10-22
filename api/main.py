@@ -12,8 +12,8 @@ Run:
 
 import json
 import os
-from typing import Literal
 from datetime import datetime
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -96,19 +96,38 @@ def health():
     return {"status": "healthy", "timestamp": datetime.now().astimezone().isoformat()}
 
 
+# Node ID cache for fast existence checks
+_VALID_NODE_IDS: set[int] | None = None
+
+
+def get_valid_nodes() -> set[int]:
+    global _VALID_NODE_IDS
+    if _VALID_NODE_IDS is None:
+        if os.path.exists(GRAPH_JSON):
+            try:
+                with open(GRAPH_JSON, encoding="utf-8") as f:
+                    data = json.load(f)
+                _VALID_NODE_IDS = {int(n["id"]) for n in data.get("nodes", [])}
+            except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
+                _VALID_NODE_IDS = set()
+        else:
+            _VALID_NODE_IDS = set()
+    return _VALID_NODE_IDS
+
+
 @app.get("/graph/summary", tags=["Graph"])
 def graph_summary():
     """Return graph metadata (node count, bounds, center)."""
     if not os.path.exists(SUMMARY_JSON):
         raise HTTPException(404, "Graph summary not found. Run export_city_graph.py")
-    with open(SUMMARY_JSON) as f:
+    with open(SUMMARY_JSON, encoding="utf-8") as f:
         return json.load(f)
 
 
 @app.get("/route", tags=["Routing"], response_model=RouteResponse)
 def get_route(
-    src: int = Query(..., description="Source node ID"),
-    dst: int = Query(..., description="Destination node ID"),
+    src: int = Query(..., gt=0, description="Source node ID (positive integer)"),
+    dst: int = Query(..., gt=0, description="Destination node ID (positive integer)"),
     hour: int = Query(default=None, ge=0, le=23,
                       description="Hour of day (0-23). Defaults to current hour."),
     weather: Literal["Clear", "Clouds", "Rain", "Drizzle", "Fog", "Mist", "Haze"] = Query(
@@ -140,6 +159,20 @@ def get_route(
             "Source and destination must be different nodes (src == dst)"
         )
 
+    valid_nodes = get_valid_nodes()
+    if valid_nodes and (src not in valid_nodes or dst not in valid_nodes):
+        missing_node = src if src not in valid_nodes else dst
+        raise HTTPException(
+            404,
+            {
+                "message": f"Node {missing_node} not found in graph",
+                "scenario": scenario,
+                "priority": priority,
+                "data_source": "simulated demo scenario; no live incident feed",
+                "tip": "Please select valid nodes from the Indiranagar graph or click on the map."
+            }
+        )
+
     # Default to current time
     now = datetime.now().astimezone()
     hour = hour if hour is not None else now.hour
@@ -147,14 +180,11 @@ def get_route(
 
     # Apply local, explicitly simulated incidents after the traffic prediction.
     base_weights_path = ml.get_or_compute_weights(hour, day, weather)
+    weights_path = None
     try:
         weights_path, incident_context = create_route_weights(
             GRAPH_JSON, base_weights_path, scenario, priority
         )
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from exc
-
-    try:
         result = run_cpp_engine(
             graph_json=GRAPH_JSON,
             src=src,
@@ -162,13 +192,18 @@ def get_route(
             weights_json=weights_path,
             algo=algo,
         )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     finally:
-        if os.path.exists(weights_path):
-            os.remove(weights_path)
+        if weights_path and os.path.exists(weights_path):
+            try:
+                os.remove(weights_path)
+            except OSError:
+                pass
 
     if "error" in result:
         detail = result["error"]
-        # Distinguish "no path" from engine errors
+        # Distinguish "no path" / "not found" from engine crash errors
         if "No path" in detail or "not found" in detail.lower():
             raise HTTPException(
                 404,
@@ -194,11 +229,13 @@ def get_route(
 
 @app.get("/congestion", tags=["ML"], response_model=CongestionResponse)
 def predict_congestion(
-    from_node: int = Query(...),
-    to_node: int = Query(...),
-    hour: int = Query(default=8, ge=0, le=23),
-    weather: str = Query(default="Clear"),
-    road_length: float = Query(default=500.0, description="Road segment length in meters")
+    from_node: int = Query(..., gt=0, description="From node ID"),
+    to_node: int = Query(..., gt=0, description="To node ID"),
+    hour: int = Query(default=8, ge=0, le=23, description="Hour of day (0-23)"),
+    weather: Literal["Clear", "Clouds", "Rain", "Drizzle", "Fog", "Mist", "Haze"] = Query(
+        default="Clear", description="Weather condition"
+    ),
+    road_length: float = Query(default=500.0, gt=0, description="Road segment length in meters")
 ):
     """Predict congestion level for a specific road segment."""
     result = ml.predict_single_edge(
@@ -213,9 +250,11 @@ def predict_congestion(
 
 @app.get("/heatmap", tags=["ML"])
 def get_heatmap(
-    hour: int = Query(default=None, ge=0, le=23),
-    weather: str = Query(default="Clear"),
-    day: int = Query(default=None, ge=0, le=6)
+    hour: int = Query(default=None, ge=0, le=23, description="Hour of day (0-23)"),
+    weather: Literal["Clear", "Clouds", "Rain", "Drizzle", "Fog", "Mist", "Haze"] = Query(
+        default="Clear", description="Weather condition"
+    ),
+    day: int = Query(default=None, ge=0, le=6, description="Day of week (0=Mon)")
 ):
     """
     Return GeoJSON FeatureCollection of all road segments colored by
@@ -231,8 +270,10 @@ def get_heatmap(
 
 @app.get("/simulate", tags=["Simulation"])
 def simulate_day(
-    weather: str = Query(default="Clear"),
-    day: int = Query(default=0)
+    weather: Literal["Clear", "Clouds", "Rain", "Drizzle", "Fog", "Mist", "Haze"] = Query(
+        default="Clear", description="Weather condition"
+    ),
+    day: int = Query(default=0, ge=0, le=6, description="Day of week (0=Mon)")
 ):
     """
     Return congestion predictions for all 24 hours of a given day.
@@ -247,11 +288,20 @@ def simulate_day(
 
 @app.get("/nodes/nearest", tags=["Graph"])
 def nearest_node(
-    lat: float = Query(..., description="Latitude"),
-    lon: float = Query(..., description="Longitude")
+    lat: float = Query(..., ge=-90.0, le=90.0, description="Latitude (-90 to 90)"),
+    lon: float = Query(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
 ):
     """Find the nearest graph node to given coordinates."""
     result = ml.find_nearest_node(lat, lon)
     if result is None:
-        raise HTTPException(404, "No graph data loaded")
+        raise HTTPException(503, "No graph data loaded")
+    if result.get("distance_m", 0) > 10000.0:
+        raise HTTPException(
+            400,
+            {
+                "message": f"Coordinates ({lat}, {lon}) are outside the supported graph area (Indiranagar, Bangalore).",
+                "distance_m": result.get("distance_m"),
+                "tip": "Please click within the Indiranagar map bounds."
+            }
+        )
     return result

@@ -94,9 +94,9 @@ def run_cpp_engine(
 
 
 def _python_fallback(graph_json: str, src: int, dst: int,
-                      weights_json: str | None, algo: str) -> dict:
+                      weights_json: str | None, algo: str = "astar") -> dict:
     """
-    Pure-Python A* fallback when C++ binary isn't compiled.
+    Pure-Python A* / Dijkstra fallback when C++ binary isn't compiled.
     Used during development/demo. Slower but functionally identical.
     """
     import heapq
@@ -105,26 +105,43 @@ def _python_fallback(graph_json: str, src: int, dst: int,
     if not os.path.exists(graph_json):
         return {"error": "Graph data not found"}
 
-    with open(graph_json) as f:
+    algo_norm = (algo or "astar").lower()
+    if algo_norm not in ("astar", "dijkstra"):
+        return {"error": f"Unsupported algorithm '{algo}'"}
+
+    algorithm_name = f"{algo_norm}_python_fallback"
+
+    with open(graph_json, encoding="utf-8") as f:
         data = json.load(f)
 
     # Build adjacency map
-    nodes = {n["id"]: n for n in data["nodes"]}
-    adj = {}
-    for node in data["nodes"]:
-        adj[node["id"]] = []
-    for e in data["edges"]:
-        speed = e.get("speed_kph", 40)
-        base_time = e["length"] / (speed * 1000 / 3600)
-        adj[e["from"]].append({
-            "to": e["to"], "length": e["length"], "time": base_time
-        })
+    nodes = {int(n["id"]): n for n in data["nodes"]}
+    adj: dict[int, list[dict]] = {n["id"]: [] for n in data["nodes"]}
+    for e in data.get("edges", []):
+        if "from" not in e or "to" not in e or "length" not in e:
+            continue
+        try:
+            speed = float(e.get("speed_kph") or 40.0)
+            if speed <= 0:
+                speed = 40.0
+            length = float(e["length"])
+            if length < 0:
+                length = 0.0
+            base_time = length / (speed * 1000.0 / 3600.0)
+            from_node = int(e["from"])
+            to_node = int(e["to"])
+            if from_node in adj:
+                adj[from_node].append({
+                    "to": to_node, "length": length, "time": base_time
+                })
+        except (TypeError, ValueError):
+            continue
 
     # Apply ML weights if available
     if weights_json and os.path.exists(weights_json):
-        with open(weights_json) as f:
+        with open(weights_json, encoding="utf-8") as f:
             weights = json.load(f)
-        weight_map = {(w["from"], w["to"]): w["time_weight"] for w in weights}
+        weight_map = {(int(w["from"]), int(w["to"])): float(w["time_weight"]) for w in weights}
         for from_id, edges in adj.items():
             for edge in edges:
                 key = (from_id, edge["to"])
@@ -132,26 +149,47 @@ def _python_fallback(graph_json: str, src: int, dst: int,
                     edge["time"] = weight_map[key]
 
     def haversine(n1, n2):
-        R = 6371000
+        R = 6371000.0
         lat1, lon1 = math.radians(n1["lat"]), math.radians(n1["lon"])
         lat2, lon2 = math.radians(n2["lat"]), math.radians(n2["lon"])
-        dlat = lat2 - lat1; dlon = lon2 - lon1
-        a = math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin(dlon/2)**2
-        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat / 2.0)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2.0)**2
+        return R * 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
 
     if src not in nodes or dst not in nodes:
-        return {"error": f"Node {src} or {dst} not found in graph"}
+        missing = src if src not in nodes else dst
+        return {"error": f"Node {missing} not found in graph"}
 
-    # A* search
-    open_set = [(0.0, src)]
+    if src == dst:
+        node = nodes[src]
+        return {
+            "algorithm": algorithm_name,
+            "total_distance_m": 0.0,
+            "total_time_s": 0.0,
+            "eta_minutes": 0.0,
+            "num_nodes": 1,
+            "path": [{"id": src, "lat": node["lat"], "lon": node["lon"], "name": node.get("name", "")}]
+        }
+
+    # Priority queue: (priority, current_node)
+    # For A*: priority = g_score + heuristic(current, dst)
+    # For Dijkstra: priority = g_score (heuristic = 0.0)
+    initial_h = (haversine(nodes[src], nodes[dst]) / 22.22) if algo_norm == "astar" else 0.0
+    open_set = [(initial_h, src)]
     g_score = {src: 0.0}
-    g_dist  = {src: 0.0}
+    g_dist = {src: 0.0}
     came_from = {}
+    visited = set()
 
     while open_set:
-        f, current = heapq.heappop(open_set)
+        _priority, current = heapq.heappop(open_set)
+
+        if current in visited:
+            continue
+        visited.add(current)
+
         if current == dst:
-            # Reconstruct
             path = []
             at = dst
             while at != src:
@@ -159,29 +197,33 @@ def _python_fallback(graph_json: str, src: int, dst: int,
                 at = came_from[at]
             path.append(src)
             path.reverse()
-            path_nodes = [{"id": n, "lat": nodes[n]["lat"],
-                           "lon": nodes[n]["lon"], "name": nodes[n].get("name","")}
-                          for n in path if n in nodes]
+            path_nodes = [
+                {"id": n, "lat": nodes[n]["lat"], "lon": nodes[n]["lon"], "name": nodes[n].get("name", "")}
+                for n in path if n in nodes
+            ]
             return {
-                "algorithm": "astar_python_fallback",
-                "total_distance_m": round(g_dist.get(dst, 0), 2),
+                "algorithm": algorithm_name,
+                "total_distance_m": round(g_dist.get(dst, 0.0), 2),
                 "total_time_s": round(g_score[dst], 2),
-                "eta_minutes": round(g_score[dst] / 60, 2),
+                "eta_minutes": round(g_score[dst] / 60.0, 2),
                 "num_nodes": len(path),
                 "path": path_nodes
             }
 
+        cur_g = g_score[current]
         for edge in adj.get(current, []):
-            if edge["time"] <= 0:
+            if edge["time"] <= 0.0 or not math.isfinite(edge["time"]):
                 continue
             nb = edge["to"]
-            tentative = g_score[current] + edge["time"]
+            if nb in visited:
+                continue
+
+            tentative = cur_g + edge["time"]
             if tentative < g_score.get(nb, float("inf")):
                 came_from[nb] = current
                 g_score[nb] = tentative
-                g_dist[nb] = g_dist.get(current, 0) + edge["length"]
-                h = haversine(nodes[current], nodes[nb]) / 22.22 \
-                    if current in nodes and nb in nodes else 0
+                g_dist[nb] = g_dist.get(current, 0.0) + edge["length"]
+                h = (haversine(nodes[nb], nodes[dst]) / 22.22) if algo_norm == "astar" else 0.0
                 heapq.heappush(open_set, (tentative + h, nb))
 
     return {"error": "No path found between the specified nodes"}
