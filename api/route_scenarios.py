@@ -107,14 +107,11 @@ def create_route_weights(graph_path: str, base_weights_path: str | None,
                 weight["time_weight"] = float(weight["time_weight"]) * 1.25
                 emergency_high_cost_segments += 1
 
-    handle = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", suffix=".json", prefix="smartroute-",
         delete=False,
-    )
-    try:
+    ) as handle:
         json.dump(weights, handle)
-    finally:
-        handle.close()
 
     return handle.name, {
         "scenario": scenario,

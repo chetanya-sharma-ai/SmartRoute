@@ -183,7 +183,7 @@ def _python_fallback(graph_json: str, src: int, dst: int,
     visited = set()
 
     while open_set:
-        priority, current = heapq.heappop(open_set)
+        _priority, current = heapq.heappop(open_set)
 
         if current in visited:
             continue

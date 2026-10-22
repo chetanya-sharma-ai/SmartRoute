@@ -6,6 +6,7 @@ Tests for route safety, alternate-route selection, validation, and error cases.
 import json
 import os
 import sys
+from itertools import pairwise
 
 import pytest
 
@@ -13,7 +14,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from api.engine_runner import run_cpp_engine
 from api.route_scenarios import create_route_weights
-
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -243,7 +243,8 @@ def test_malformed_edges_are_skipped_gracefully(tmp_path, monkeypatch):
 
     weights_path, ctx = create_route_weights(str(graph_path), None, "normal", "standard")
     try:
-        weights = json.loads(open(weights_path, encoding="utf-8").read())
+        with open(weights_path, encoding="utf-8") as weights_file:
+            weights = json.load(weights_file)
     finally:
         os.remove(weights_path)
 
@@ -276,7 +277,8 @@ def test_emergency_profile_increases_high_congestion_cost(tmp_path, monkeypatch)
         str(graph_path), str(base_path), "normal", "emergency"
     )
     try:
-        weights = json.loads(open(weights_path, encoding="utf-8").read())
+        with open(weights_path, encoding="utf-8") as weights_file:
+            weights = json.load(weights_file)
     finally:
         os.remove(weights_path)
 
@@ -305,7 +307,8 @@ def test_emergency_does_not_affect_low_congestion_edges(tmp_path, monkeypatch):
         str(graph_path), str(base_path), "normal", "emergency"
     )
     try:
-        weights = json.loads(open(weights_path, encoding="utf-8").read())
+        with open(weights_path, encoding="utf-8") as weights_file:
+            weights = json.load(weights_file)
     finally:
         os.remove(weights_path)
 
@@ -338,7 +341,8 @@ def test_simulated_congestion_spike_increases_named_road_cost(tmp_path, monkeypa
         str(graph_path), str(base_path), "congestion_spike", "standard"
     )
     try:
-        weights = json.loads(open(weights_path, encoding="utf-8").read())
+        with open(weights_path, encoding="utf-8") as weights_file:
+            weights = json.load(weights_file)
     finally:
         os.remove(weights_path)
 
@@ -428,7 +432,7 @@ def _get_path_edge_names(path_nodes, graph_data):
     for edge in graph_data.get("edges", []):
         edge_map[(edge["from"], edge["to"])] = edge.get("name")
     names = []
-    for u, v in zip(path_nodes[:-1], path_nodes[1:]):
+    for u, v in pairwise(path_nodes):
         names.append(edge_map.get((u, v)) or "")
     return names
 
@@ -565,5 +569,4 @@ def test_real_graph_python_fallback(monkeypatch):
         assert res_dijkstra["total_distance_m"] > 0
     finally:
         os.remove(w_norm)
-
 

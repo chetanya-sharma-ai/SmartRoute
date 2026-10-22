@@ -12,8 +12,8 @@ Run:
 
 import json
 import os
-from typing import Literal
 from datetime import datetime
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -108,7 +108,7 @@ def get_valid_nodes() -> set[int]:
                 with open(GRAPH_JSON, encoding="utf-8") as f:
                     data = json.load(f)
                 _VALID_NODE_IDS = {int(n["id"]) for n in data.get("nodes", [])}
-            except Exception:
+            except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
                 _VALID_NODE_IDS = set()
         else:
             _VALID_NODE_IDS = set()
@@ -160,19 +160,18 @@ def get_route(
         )
 
     valid_nodes = get_valid_nodes()
-    if valid_nodes:
-        if src not in valid_nodes or dst not in valid_nodes:
-            missing_node = src if src not in valid_nodes else dst
-            raise HTTPException(
-                404,
-                {
-                    "message": f"Node {missing_node} not found in graph",
-                    "scenario": scenario,
-                    "priority": priority,
-                    "data_source": "simulated demo scenario; no live incident feed",
-                    "tip": "Please select valid nodes from the Indiranagar graph or click on the map."
-                }
-            )
+    if valid_nodes and (src not in valid_nodes or dst not in valid_nodes):
+        missing_node = src if src not in valid_nodes else dst
+        raise HTTPException(
+            404,
+            {
+                "message": f"Node {missing_node} not found in graph",
+                "scenario": scenario,
+                "priority": priority,
+                "data_source": "simulated demo scenario; no live incident feed",
+                "tip": "Please select valid nodes from the Indiranagar graph or click on the map."
+            }
+        )
 
     # Default to current time
     now = datetime.now().astimezone()
