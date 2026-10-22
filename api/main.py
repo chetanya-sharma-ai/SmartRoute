@@ -12,6 +12,7 @@ Run:
 
 import json
 import os
+from typing import Literal
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Query
@@ -21,6 +22,7 @@ from pydantic import BaseModel
 
 from .engine_runner import run_cpp_engine
 from .ml_inference import MLInference
+from .route_scenarios import create_route_weights
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -62,6 +64,7 @@ class RouteResponse(BaseModel):
     num_nodes: int
     path: list
     congestion_context: dict
+    incident_context: dict
 
 
 class CongestionResponse(BaseModel):
@@ -108,11 +111,22 @@ def get_route(
     dst: int = Query(..., description="Destination node ID"),
     hour: int = Query(default=None, ge=0, le=23,
                       description="Hour of day (0-23). Defaults to current hour."),
-    weather: str = Query(default="Clear",
-                         description="Weather: Clear/Clouds/Rain/Drizzle/Fog/Mist/Haze"),
+    weather: Literal["Clear", "Clouds", "Rain", "Drizzle", "Fog", "Mist", "Haze"] = Query(
+        default="Clear", description="Weather: Clear/Clouds/Rain/Drizzle/Fog/Mist/Haze"
+    ),
     day: int = Query(default=None, ge=0, le=6,
                      description="Day of week (0=Mon). Defaults to today."),
-    algo: str = Query(default="astar", description="Algorithm: astar or dijkstra")
+    algo: Literal["astar", "dijkstra"] = Query(
+        default="astar", description="Algorithm: astar or dijkstra"
+    ),
+    scenario: Literal[
+        "normal", "road_closure", "flash_flood", "access_restriction", "congestion_spike"
+    ] = Query(
+        default="normal", description="Simulated demo incident scenario"
+    ),
+    priority: Literal["standard", "emergency"] = Query(
+        default="standard", description="Emergency profile adds extra cost to high-congestion edges"
+    ),
 ):
     """
     Find the fastest route between two nodes using ML-adjusted edge weights.
@@ -120,29 +134,58 @@ def get_route(
     if not os.path.exists(GRAPH_JSON):
         raise HTTPException(503, "Graph data not found. Run export_city_graph.py")
 
+    if src == dst:
+        raise HTTPException(
+            422,
+            "Source and destination must be different nodes (src == dst)"
+        )
+
     # Default to current time
     now = datetime.now().astimezone()
     hour = hour if hour is not None else now.hour
     day  = day  if day  is not None else now.weekday()
 
-    # Get ML-adjusted weights for this time/weather
-    weights_path = ml.get_or_compute_weights(hour, day, weather)
+    # Apply local, explicitly simulated incidents after the traffic prediction.
+    base_weights_path = ml.get_or_compute_weights(hour, day, weather)
+    try:
+        weights_path, incident_context = create_route_weights(
+            GRAPH_JSON, base_weights_path, scenario, priority
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
-    # Run C++ engine
-    result = run_cpp_engine(
-        graph_json=GRAPH_JSON,
-        src=src,
-        dst=dst,
-        weights_json=weights_path,
-        algo=algo
-    )
+    try:
+        result = run_cpp_engine(
+            graph_json=GRAPH_JSON,
+            src=src,
+            dst=dst,
+            weights_json=weights_path,
+            algo=algo,
+        )
+    finally:
+        if os.path.exists(weights_path):
+            os.remove(weights_path)
 
     if "error" in result:
-        raise HTTPException(404, f"No route found: {result['error']}")
+        detail = result["error"]
+        # Distinguish "no path" from engine errors
+        if "No path" in detail or "not found" in detail.lower():
+            raise HTTPException(
+                404,
+                {
+                    "message": f"No safe route found: {detail}",
+                    "scenario": scenario,
+                    "priority": priority,
+                    "data_source": "simulated demo scenario; no live incident feed",
+                    "tip": "The selected scenario may have blocked all paths between these nodes. Try a different node pair or scenario."
+                }
+            )
+        raise HTTPException(503, f"Routing engine error: {detail}")
 
     # Add congestion context
     congestion_ctx = ml.predict_congestion_single(hour, day, weather)
     result["congestion_context"] = congestion_ctx
+    result["incident_context"] = incident_context
     result["src"] = src
     result["dst"] = dst
 

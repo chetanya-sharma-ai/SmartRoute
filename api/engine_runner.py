@@ -172,6 +172,8 @@ def _python_fallback(graph_json: str, src: int, dst: int,
             }
 
         for edge in adj.get(current, []):
+            if edge["time"] <= 0:
+                continue
             nb = edge["to"]
             tentative = g_score[current] + edge["time"]
             if tentative < g_score.get(nb, float("inf")):

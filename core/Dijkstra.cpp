@@ -1,5 +1,6 @@
 #include "Dijkstra.h"
 #include <algorithm>
+#include <cmath>
 
 // Min-heap entry: {cost, node_id}
 using PQEntry = std::pair<double, int64_t>;
@@ -43,6 +44,7 @@ PathResult Dijkstra::findPath(int64_t src, int64_t dst) {
         if (cost > dist[u]) continue; // stale entry
 
         for (const auto& edge : graph_.getNeighbors(u)) {
+            if (!std::isfinite(edge.time_weight) || edge.time_weight <= 0.0) continue;
             double new_cost = dist[u] + edge.time_weight;
             if (dist.find(edge.to) == dist.end() || new_cost < dist[edge.to]) {
                 dist[edge.to] = new_cost;

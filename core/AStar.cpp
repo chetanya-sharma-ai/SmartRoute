@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <limits>
+#include <cmath>
 
 using PQEntry = std::pair<double, int64_t>; // {f_score, node}
 
@@ -48,6 +49,7 @@ PathResult AStar::findPath(int64_t src, int64_t dst) {
                                                : std::numeric_limits<double>::infinity();
 
         for (const auto& edge : graph_.getNeighbors(current)) {
+            if (!std::isfinite(edge.time_weight) || edge.time_weight <= 0.0) continue;
             double tentative_g = g_cur + edge.time_weight;
             double known_g = g_score.count(edge.to) ? g_score[edge.to]
                                                      : std::numeric_limits<double>::infinity();

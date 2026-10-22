@@ -1,0 +1,31 @@
+{
+  "data_source": "simulated demo scenarios; not a live incident feed",
+  "scenarios": {
+    "normal": {
+      "label": "Normal conditions",
+      "condition": null,
+      "road_names": []
+    },
+    "road_closure": {
+      "label": "Simulated road closure",
+      "condition": "blocked",
+      "road_names": ["100 Feet Road"]
+    },
+    "flash_flood": {
+      "label": "Simulated flash flood",
+      "condition": "flooded",
+      "road_names": ["Swamy Vivekananda Road"]
+    },
+    "access_restriction": {
+      "label": "Simulated emergency access restriction",
+      "condition": "inaccessible",
+      "road_names": ["11th Main Road"]
+    },
+    "congestion_spike": {
+      "label": "Simulated congestion spike",
+      "condition": "congested",
+      "multiplier": 2.5,
+      "road_names": ["80 Feet Road"]
+    }
+  }
+}
