@@ -1,10 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>SmartRoute — Emergency-Aware Route Optimization · Indiranagar, Bangalore</title>
-  <meta name="description" content="Demo: AI-powered route planning that avoids blocked, flooded, and inaccessible roads. Simulated data — Indiranagar, Bangalore.">
+  <meta name="description"
+    content="Demo: AI-powered route planning that avoids blocked, flooded, and inaccessible roads. Simulated data — Indiranagar, Bangalore." />
+
+  <!-- PWA & Mobile Meta Tags -->
+  <meta name="theme-color" content="#1d4ed8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SmartRoute" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -13,17 +25,34 @@
 
   <style>
     /* ── Reset & Base ───────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --safe-bottom: env(safe-area-inset-bottom, 16px);
+      --safe-top: env(safe-area-inset-top, 0px);
+      --peek-height: 76px;
+      --half-height: 52vh;
+      --full-height: 88vh;
+    }
+
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
       background: #0f172a;
       color: #e2e8f0;
       display: flex;
       height: 100vh;
+      height: 100dvh;
       overflow: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Sidebar ─────────────────────────────────────────────────── */
+    /* ── Sidebar (Desktop) / Bottom Sheet (Mobile) ─────────────── */
     #sidebar {
       width: 340px;
       min-width: 300px;
@@ -33,18 +62,29 @@
       padding: 0;
       overflow-y: auto;
       z-index: 1000;
-      box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+      box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+      flex-shrink: 0;
+    }
+
+    /* Mobile Sheet Handle Bar — Hidden on Desktop */
+    .sheet-handle-bar {
+      display: none;
     }
 
     .sidebar-header {
       padding: 20px 20px 16px;
       background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%);
     }
+
     .sidebar-header h1 {
       font-size: 1.4rem;
       font-weight: 800;
       letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
+
     .sidebar-header p {
       font-size: 0.78rem;
       opacity: 0.85;
@@ -62,12 +102,29 @@
       align-items: center;
       gap: 6px;
     }
-    .sim-banner strong { font-weight: 700; }
+
+    .sim-banner strong {
+      font-weight: 700;
+    }
+
+    /* ── Offline & Connectivity Banner ───────────────────────────── */
+    .conn-banner {
+      background: #450a0a;
+      border-bottom: 2px solid #ef4444;
+      padding: 7px 20px;
+      font-size: 0.73rem;
+      color: #fca5a5;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.35;
+    }
 
     .section {
       padding: 16px 20px;
       border-bottom: 1px solid #334155;
     }
+
     .section h2 {
       font-size: 0.75rem;
       font-weight: 700;
@@ -83,85 +140,138 @@
       color: #94a3b8;
       margin-bottom: 4px;
     }
-    input, select {
+
+    input,
+    select {
       width: 100%;
       background: #0f172a;
       border: 1px solid #334155;
       border-radius: 8px;
       color: #e2e8f0;
-      padding: 8px 12px;
-      font-size: 0.85rem;
+      padding: 10px 12px;
+      font-size: 0.88rem;
       margin-bottom: 12px;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    input:focus, select:focus { border-color: #3b82f6; }
+
+    input:focus,
+    select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+    }
 
     .btn {
       width: 100%;
-      padding: 10px;
+      padding: 11px 12px;
       border-radius: 8px;
       border: none;
       font-weight: 700;
       font-size: 0.9rem;
       cursor: pointer;
       transition: all 0.2s;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      touch-action: manipulation;
     }
+
     .btn-primary {
       background: linear-gradient(135deg, #2563eb, #7c3aed);
       color: white;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
     }
-    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    .btn-primary:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+      opacity: 0.85;
+    }
+
     .btn-secondary {
       background: #1e293b;
       border: 1px solid #334155;
       color: #94a3b8;
       margin-top: 8px;
     }
-    .btn-secondary:hover { border-color: #3b82f6; color: #e2e8f0; }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-secondary:hover {
+      border-color: #3b82f6;
+      color: #e2e8f0;
+    }
+
+    .btn-secondary:active {
+      background: #0f172a;
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
 
     /* ── Map picker controls ─────────────────────────────────────── */
     .picker-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 6px;
+      gap: 8px;
       margin-bottom: 8px;
     }
+
     .picker-btn {
-      padding: 7px 6px;
-      border-radius: 6px;
+      padding: 10px 8px;
+      border-radius: 8px;
       border: 1px solid #334155;
       background: #0f172a;
       color: #94a3b8;
-      font-size: 0.73rem;
+      font-size: 0.76rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
       text-align: center;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
     }
-    .picker-btn:hover { border-color: #3b82f6; color: #e2e8f0; }
+
+    .picker-btn:hover {
+      border-color: #3b82f6;
+      color: #e2e8f0;
+    }
+
     .picker-btn.active-src {
       background: #14532d;
       border-color: #22c55e;
       color: #86efac;
-      box-shadow: 0 0 10px rgba(34,197,94,0.35);
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.35);
     }
+
     .picker-btn.active-dst {
       background: #7f1d1d;
       border-color: #ef4444;
       color: #fca5a5;
-      box-shadow: 0 0 10px rgba(239,68,68,0.35);
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
     }
+
     .picker-status {
-      font-size: 0.72rem;
-      padding: 6px 10px;
+      font-size: 0.74rem;
+      padding: 8px 12px;
       background: #1e3a5f;
       border: 1px solid #3b82f6;
       border-radius: 6px;
       color: #93c5fd;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       display: none;
+      line-height: 1.4;
     }
 
     /* ── Stale route warning banner ───────────────────────────────── */
@@ -169,12 +279,12 @@
       background: #422006;
       border: 1px solid #f59e0b;
       color: #fef08a;
-      padding: 8px 12px;
+      padding: 10px 14px;
       border-radius: 8px;
-      font-size: 0.74rem;
+      font-size: 0.75rem;
       margin-bottom: 12px;
       display: none;
-      line-height: 1.35;
+      line-height: 1.4;
     }
 
     /* ── Scenario info card ───────────────────────────────────────── */
@@ -186,16 +296,19 @@
       margin-bottom: 8px;
       font-size: 0.74rem;
     }
+
     .scenario-info-title {
       font-weight: 700;
       color: #f1f5f9;
       margin-bottom: 3px;
     }
+
     .scenario-info-detail {
       color: #94a3b8;
       font-size: 0.71rem;
       line-height: 1.35;
     }
+
     .displayed-scenario-row {
       margin-top: 8px;
       padding-top: 6px;
@@ -205,60 +318,92 @@
       align-items: center;
       font-size: 0.72rem;
     }
-    .displayed-scenario-row .key { color: #94a3b8; }
-    .displayed-scenario-row .val { color: #60a5fa; font-weight: 700; }
 
+    .displayed-scenario-row .key {
+      color: #94a3b8;
+    }
+
+    .displayed-scenario-row .val {
+      color: #60a5fa;
+      font-weight: 700;
+    }
 
     /* ── Scenario preset buttons ─────────────────────────────────── */
     .preset-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
       margin-bottom: 8px;
     }
+
     .preset-btn {
-      padding: 7px 6px;
-      border-radius: 6px;
+      padding: 9px 8px;
+      border-radius: 8px;
       border: 1px solid #334155;
       background: #0f172a;
       color: #94a3b8;
-      font-size: 0.72rem;
+      font-size: 0.74rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.18s;
       text-align: center;
-      line-height: 1.3;
+      line-height: 1.35;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
     }
-    .preset-btn:hover, .preset-btn.active {
+
+    .preset-btn:hover,
+    .preset-btn.active {
       border-color: #3b82f6;
       color: #e2e8f0;
       background: #1e3a5f;
     }
-    .preset-btn.active { border-color: #60a5fa; }
+
+    .preset-btn.active {
+      border-color: #60a5fa;
+      box-shadow: 0 0 10px rgba(96, 165, 250, 0.25);
+    }
 
     /* ── Status / Result panels ────────────────────────────────── */
     #status-bar {
       padding: 10px 20px;
       background: #0f172a;
       font-size: 0.78rem;
-      color: #64748b;
+      color: #94a3b8;
       border-bottom: 1px solid #1e293b;
-      min-height: 36px;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      line-height: 1.35;
     }
-    #status-bar.loading { color: #60a5fa; }
-    #status-bar.error   { color: #f87171; }
-    #status-bar.success { color: #4ade80; }
+
+    #status-bar.loading {
+      color: #60a5fa;
+    }
+
+    #status-bar.error {
+      color: #f87171;
+    }
+
+    #status-bar.success {
+      color: #4ade80;
+    }
 
     #result-panel {
       padding: 16px 20px;
       display: none;
     }
+
     .stat-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
       margin-bottom: 12px;
     }
+
     .stat-card {
       background: #0f172a;
       border-radius: 10px;
@@ -266,11 +411,13 @@
       text-align: center;
       border: 1px solid #1e293b;
     }
+
     .stat-card .val {
-      font-size: 1.4rem;
+      font-size: 1.35rem;
       font-weight: 800;
       color: #60a5fa;
     }
+
     .stat-card .lbl {
       font-size: 0.7rem;
       color: #64748b;
@@ -285,9 +432,21 @@
       font-weight: 700;
       margin-bottom: 8px;
     }
-    .badge-Low    { background: #14532d; color: #4ade80; }
-    .badge-Medium { background: #78350f; color: #fbbf24; }
-    .badge-High   { background: #7f1d1d; color: #f87171; }
+
+    .badge-Low {
+      background: #14532d;
+      color: #4ade80;
+    }
+
+    .badge-Medium {
+      background: #78350f;
+      color: #fbbf24;
+    }
+
+    .badge-High {
+      background: #7f1d1d;
+      color: #f87171;
+    }
 
     /* ── Incident panel ──────────────────────────────────────────── */
     #incident-panel {
@@ -297,6 +456,7 @@
       border: 1px solid #334155;
       display: none;
     }
+
     .incident-header {
       padding: 8px 12px;
       font-size: 0.75rem;
@@ -304,25 +464,74 @@
       text-transform: uppercase;
       letter-spacing: 0.8px;
     }
+
     .incident-body {
       padding: 10px 12px;
       font-size: 0.78rem;
       color: #94a3b8;
       background: #0f172a;
     }
-    .incident-body .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-    .incident-body .key { color: #64748b; }
-    .incident-body .val { color: #e2e8f0; font-weight: 600; }
-    .incident-blocked   { background: #450a0a; }
-    .incident-blocked .incident-header { background: #7f1d1d; color: #fca5a5; }
-    .incident-flooded   { background: #082f49; }
-    .incident-flooded .incident-header { background: #0c4a6e; color: #7dd3fc; }
-    .incident-inaccessible { background: #1c1917; }
-    .incident-inaccessible .incident-header { background: #44403c; color: #e7e5e4; }
-    .incident-congested { background: #431407; }
-    .incident-congested .incident-header { background: #7c2d12; color: #fdba74; }
-    .incident-clear     { background: #052e16; }
-    .incident-clear .incident-header { background: #14532d; color: #86efac; }
+
+    .incident-body .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .incident-body .key {
+      color: #64748b;
+    }
+
+    .incident-body .val {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    .incident-blocked {
+      background: #450a0a;
+    }
+
+    .incident-blocked .incident-header {
+      background: #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .incident-flooded {
+      background: #082f49;
+    }
+
+    .incident-flooded .incident-header {
+      background: #0c4a6e;
+      color: #7dd3fc;
+    }
+
+    .incident-inaccessible {
+      background: #1c1917;
+    }
+
+    .incident-inaccessible .incident-header {
+      background: #44403c;
+      color: #e7e5e4;
+    }
+
+    .incident-congested {
+      background: #431407;
+    }
+
+    .incident-congested .incident-header {
+      background: #7c2d12;
+      color: #fdba74;
+    }
+
+    .incident-clear {
+      background: #052e16;
+    }
+
+    .incident-clear .incident-header {
+      background: #14532d;
+      color: #86efac;
+    }
+
     .sim-note {
       font-size: 0.68rem;
       color: #64748b;
@@ -337,21 +546,228 @@
     #map {
       flex: 1;
       height: 100vh;
+      height: 100dvh;
+      position: relative;
     }
 
     /* ── Legend ──────────────────────────────────────────────────── */
     .map-legend {
-      background: rgba(15,23,42,0.92);
+      background: rgba(15, 23, 42, 0.94);
       border: 1px solid #334155;
-      padding: 12px 16px;
+      padding: 0;
       border-radius: 10px;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       color: #e2e8f0;
-      backdrop-filter: blur(4px);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      max-width: 225px;
+      user-select: none;
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .map-legend h3 { font-size: 0.7rem; color: #94a3b8; margin-bottom: 8px; }
-    .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+    .legend-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(30, 41, 59, 0.85);
+      cursor: pointer;
+      gap: 8px;
+      min-height: 38px;
+      border-bottom: 1px solid transparent;
+      touch-action: manipulation;
+    }
+
+    .legend-header:hover {
+      background: rgba(51, 65, 85, 0.9);
+    }
+
+    .legend-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: 0.4px;
+    }
+
+    .legend-badge-summary {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #0f172a;
+      color: #93c5fd;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 105px;
+    }
+
+    .legend-chevron {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      transition: transform 0.2s ease;
+      line-height: 1;
+    }
+
+    .map-legend.expanded .legend-chevron {
+      transform: rotate(180deg);
+    }
+
+    .map-legend.expanded .legend-header {
+      border-bottom: 1px solid #334155;
+    }
+
+    .legend-content {
+      padding: 10px 12px;
+      display: none;
+    }
+
+    .map-legend.expanded .legend-content {
+      display: block;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+      font-size: 0.74rem;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-line {
+      width: 16px;
+      height: 4px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .legend-sim-tag {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 6px;
+      background: #422006;
+      border: 1px solid #f59e0b;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      color: #fef08a;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    /* ── Distinct Route Origin / Destination Markers ─────────────── */
+    .route-pin-wrapper {
+      background: transparent !important;
+      border: none !important;
+    }
+
+    .smartroute-pin {
+      position: relative;
+      width: 28px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+    }
+
+    .smartroute-pin .pin-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #ffffff;
+      transition: transform 0.15s ease;
+    }
+
+    .smartroute-pin .pin-badge > span {
+      transform: rotate(45deg);
+      display: inline-block;
+      font-weight: 800;
+      font-size: 13px;
+      color: #ffffff;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .pin-start .pin-badge {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+    }
+
+    .pin-end .pin-badge {
+      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+    }
+
+    .smartroute-pin:hover .pin-badge {
+      transform: rotate(-45deg) scale(1.12);
+    }
+
+    .pin-pulse {
+      position: absolute;
+      bottom: 0px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 3px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 50%;
+    }
+
+    /* ── Incident map pill badges ────────────────────────────────── */
+    .incident-marker-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+      border: 1.5px solid rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      line-height: 1.2;
+    }
+
+    .pill-closure {
+      background: #dc2626;
+      color: #ffffff;
+      border-color: #fca5a5;
+    }
+
+    .pill-flood {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #7dd3fc;
+    }
+
+    .pill-restriction {
+      background: #d97706;
+      color: #ffffff;
+      border-color: #fde68a;
+    }
+
+    .pill-spike {
+      background: #ea580c;
+      color: #ffffff;
+      border-color: #fdba74;
+    }
 
     /* ── Heatmap toggle ──────────────────────────────────────────── */
     .toggle-row {
@@ -359,66 +775,95 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 10px;
+      min-height: 44px;
     }
-    .toggle-row span { font-size: 0.82rem; color: #94a3b8; }
+
+    .toggle-row span {
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
     .toggle {
       position: relative;
-      width: 44px;
-      height: 24px;
+      width: 48px;
+      height: 28px;
     }
-    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
     .slider {
       position: absolute;
       cursor: pointer;
       inset: 0;
       background: #334155;
-      border-radius: 24px;
+      border-radius: 28px;
       transition: 0.3s;
     }
+
     .slider::before {
       content: "";
       position: absolute;
-      width: 18px; height: 18px;
-      left: 3px; top: 3px;
+      width: 20px;
+      height: 20px;
+      left: 4px;
+      top: 4px;
       background: white;
       border-radius: 50%;
       transition: 0.3s;
     }
-    input:checked + .slider { background: #3b82f6; }
-    input:checked + .slider::before { transform: translateX(20px); }
+
+    input:checked+.slider {
+      background: #3b82f6;
+    }
+
+    input:checked+.slider::before {
+      transform: translateX(20px);
+    }
 
     /* ── Time slider ─────────────────────────────────────────────── */
     input[type=range] {
       -webkit-appearance: none;
       background: transparent;
-      padding: 0;
+      padding: 10px 0;
       border: none;
       margin-bottom: 4px;
+      min-height: 44px;
     }
+
     input[type=range]::-webkit-slider-runnable-track {
       background: #334155;
-      height: 6px;
-      border-radius: 3px;
+      height: 8px;
+      border-radius: 4px;
     }
+
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 18px; height: 18px;
+      width: 22px;
+      height: 22px;
       background: #3b82f6;
       border-radius: 50%;
-      margin-top: -6px;
+      margin-top: -7px;
       cursor: pointer;
+      box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
     }
+
     #hour-label {
       text-align: center;
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       color: #60a5fa;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
+      font-weight: 600;
     }
 
     /* Spinner */
     .spinner {
       display: inline-block;
-      width: 14px; height: 14px;
+      width: 14px;
+      height: 14px;
       border: 2px solid #334155;
       border-top-color: #3b82f6;
       border-radius: 50%;
@@ -426,852 +871,1607 @@
       margin-right: 6px;
       vertical-align: middle;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .tip { font-size: 0.72rem; color: #475569; margin-top: 4px; }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .tip {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-top: 4px;
+      line-height: 1.35;
+    }
+
+    /* ── Mobile Layout (< 769px) ─────────────────────────────────── */
+    @media (max-width: 768px) {
+      body {
+        position: relative;
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+      }
+
+      /* Map is full-screen background */
+      #map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+
+      /* Adjust Leaflet zoom controls to top-right to prevent overlap */
+      .leaflet-top.leaflet-left {
+        top: calc(var(--safe-top) + 12px) !important;
+        left: auto !important;
+        right: 12px !important;
+      }
+
+      .leaflet-control-zoom {
+        border: 1px solid #334155 !important;
+        background: rgba(15, 23, 42, 0.9) !important;
+        backdrop-filter: blur(8px) !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+      }
+
+      .leaflet-control-zoom a {
+        width: 40px !important;
+        height: 40px !important;
+        line-height: 40px !important;
+        background: #1e293b !important;
+        color: #e2e8f0 !important;
+        font-size: 18px !important;
+        border-bottom: 1px solid #334155 !important;
+      }
+
+      .leaflet-control-zoom a:last-child {
+        border-bottom: none !important;
+      }
+
+      /* Move legend container on mobile to top-left so it is never covered by the bottom sheet */
+      .leaflet-bottom.leaflet-right {
+        top: calc(var(--safe-top) + 12px) !important;
+        left: 12px !important;
+        bottom: auto !important;
+        right: auto !important;
+      }
+
+      .map-legend {
+        padding: 0 !important;
+        font-size: 0.68rem;
+        max-width: 195px;
+      }
+
+      .map-legend .legend-header {
+        padding: 6px 10px;
+        min-height: 34px;
+      }
+
+      .map-legend .legend-content {
+        padding: 8px 10px;
+      }
+
+      .map-legend h3 {
+        font-size: 0.63rem;
+        margin-bottom: 4px;
+      }
+
+      /* Sidebar becomes Bottom Sheet */
+      #sidebar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        border-radius: 20px 20px 0 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 -8px 36px rgba(0, 0, 0, 0.65);
+        z-index: 2000;
+        display: flex;
+        flex-direction: column;
+        transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        overflow: hidden;
+      }
+
+      /* State heights */
+      #sidebar[data-sheet-state="peek"] {
+        height: calc(var(--peek-height) + var(--safe-bottom));
+      }
+
+      #sidebar[data-sheet-state="half"] {
+        height: var(--half-height);
+      }
+
+      #sidebar[data-sheet-state="full"] {
+        height: var(--full-height);
+      }
+
+      /* Sheet drag handle & header bar */
+      .sheet-handle-bar {
+        display: block;
+        flex-shrink: 0;
+        background: #1e293b;
+        cursor: pointer;
+        user-select: none;
+        touch-action: pan-y;
+        border-bottom: 1px solid #334155;
+        padding-bottom: 4px;
+      }
+
+      .sheet-drag-pill {
+        width: 44px;
+        height: 5px;
+        border-radius: 3px;
+        background: #64748b;
+        margin: 8px auto 4px;
+        transition: background-color 0.2s;
+      }
+
+      .sheet-handle-bar:active .sheet-drag-pill {
+        background: #94a3b8;
+      }
+
+      .sheet-peek-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 16px 8px;
+        gap: 12px;
+      }
+
+      .sheet-peek-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .sheet-peek-title {
+        font-size: 0.88rem;
+        font-weight: 800;
+        color: #f8fafc;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .sheet-peek-sub {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 2px;
+      }
+
+      .sheet-peek-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .sheet-quick-route-btn {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 11px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 36px;
+        touch-action: manipulation;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+      }
+
+      .sheet-quick-route-btn:active {
+        background: #047857;
+      }
+
+      .sheet-toggle-btn {
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 36px;
+        touch-action: manipulation;
+      }
+
+      .sheet-toggle-btn:active {
+        background: #1d4ed8;
+      }
+
+      /* Content container inside the sheet */
+      .sheet-content-scroll {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        padding-bottom: calc(var(--safe-bottom) + 20px);
+      }
+
+      /* Compact mobile header */
+      .sidebar-header {
+        padding: 12px 16px;
+      }
+
+      .sidebar-header h1 {
+        font-size: 1.15rem;
+      }
+
+      .sidebar-header p {
+        font-size: 0.73rem;
+      }
+
+      .section {
+        padding: 14px 16px;
+      }
+
+      /* Minimum 16px font-size on mobile inputs prevents Safari auto-zoom */
+      input,
+      select {
+        font-size: 16px;
+      }
+    }
   </style>
 </head>
+
 <body>
 
-<!-- ── Sidebar ────────────────────────────────────────────────────────────── -->
-<aside id="sidebar">
-  <div class="sidebar-header">
-    <h1>🚦 SmartRoute</h1>
-    <p>Emergency-Aware Route Optimization · Indiranagar, Bangalore</p>
-  </div>
+  <!-- ── Sidebar / Mobile Expandable Bottom Sheet ────────────────────────────── -->
+  <aside id="sidebar" data-sheet-state="half">
 
-  <!-- Simulated-data banner — always visible -->
-  <div class="sim-banner">
-    ⚠️ <strong>SIMULATED DATA</strong> — No live traffic, weather, or incident feeds connected.
-  </div>
-
-  <!-- Status bar -->
-  <div id="status-bar">Ready. Select a demo scenario or enter node IDs.</div>
-
-  <!-- Scenario presets -->
-  <div class="section">
-    <h2>Incident Scenarios <span class="tip">(select condition)</span></h2>
-    <div class="preset-grid" id="preset-grid">
-      <button type="button" class="preset-btn active" id="preset-normal"
-        onclick="selectScenario('normal')">🟢 Normal<br>conditions</button>
-      <button type="button" class="preset-btn" id="preset-road_closure"
-        onclick="selectScenario('road_closure')">🔴 Road<br>closure</button>
-      <button type="button" class="preset-btn" id="preset-flash_flood"
-        onclick="selectScenario('flash_flood')">🌊 Flash<br>flood</button>
-      <button type="button" class="preset-btn" id="preset-access_restriction"
-        onclick="selectScenario('access_restriction')">🚧 Access<br>restriction</button>
-      <button type="button" class="preset-btn" id="preset-congestion_spike"
-        onclick="selectScenario('congestion_spike')">🟠 Congestion<br>spike</button>
-    </div>
-
-    <!-- Active scenario summary card -->
-    <div class="scenario-info-card" id="scenario-info-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <span style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;">Selected Scenario:</span>
-        <span id="scenario-info-badge" style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:#1e3a5f;color:#93c5fd;font-weight:600;">Active</span>
-      </div>
-      <div class="scenario-info-title" id="scenario-info-title">🟢 Normal conditions</div>
-      <div class="scenario-info-detail" id="scenario-info-detail">
-        Standard traffic flow across Indiranagar. Free-flow baseline route calculation with no incident blocks.
-      </div>
-      <div class="displayed-scenario-row" id="displayed-scenario-row">
-        <span class="key">Displayed Route:</span>
-        <span class="val" id="displayed-scenario-val">None (not calculated)</span>
+    <!-- Mobile Drag & Header Bar (Only visible on mobile) -->
+    <div class="sheet-handle-bar" id="sheet-handle-bar" aria-label="Expand or collapse route planning sheet">
+      <div class="sheet-drag-pill"></div>
+      <div class="sheet-peek-summary">
+        <div class="sheet-peek-info" onclick="cycleSheetState()">
+          <div class="sheet-peek-title">
+            <span>🚦 SmartRoute</span>
+            <span
+              style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:#1e3a5f;color:#60a5fa;font-weight:600;">SIMULATED</span>
+          </div>
+          <div class="sheet-peek-sub" id="sheet-peek-sub">🟢 Normal conditions · Tap to plan</div>
+        </div>
+        <div class="sheet-peek-actions">
+          <button type="button" class="sheet-quick-route-btn" id="sheet-quick-route-btn" onclick="event.stopPropagation(); findRoute()" aria-label="Calculate safe route">
+            ⚡ Route
+          </button>
+          <button type="button" class="sheet-toggle-btn" id="sheet-toggle-btn" onclick="cycleSheetState()"
+            aria-label="Toggle Route Planner size">
+            <span id="sheet-toggle-label">Route Plan ▲</span>
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Separate action to load example trip -->
-    <button type="button" class="btn btn-secondary" id="load-example-btn" onclick="loadExampleTrip()">
-      📍 Load Verified Example Trip
-    </button>
-    <p class="tip">Selecting a scenario applies to your active trip points. Loading an example trip sets verified origin/destination nodes for demonstrating this scenario.</p>
-  </div>
+    <!-- Scrollable Sheet Content -->
+    <div class="sheet-content-scroll" id="sheet-content-scroll">
 
-  <!-- Route section -->
-  <div class="section">
-    <h2>Route Planner</h2>
+      <!-- Header info -->
+      <div class="sidebar-header">
+        <h1>🚦 SmartRoute</h1>
+        <p>Emergency-Aware Route Optimization · Indiranagar, Bangalore</p>
+      </div>
 
-    <!-- Explicit map picking controls -->
-    <div class="picker-grid">
-      <button type="button" class="picker-btn" id="pick-src-btn" onclick="togglePicker('src')">
-        🟢 Choose Source on Map
-      </button>
-      <button type="button" class="picker-btn" id="pick-dst-btn" onclick="togglePicker('dst')">
-        🔴 Choose Dest on Map
-      </button>
+      <!-- Simulated-data banner — always visible -->
+      <div class="sim-banner">
+        ⚠️ <strong>SIMULATED DATA</strong> — No live traffic, weather, or incident feeds connected.
+      </div>
+
+      <!-- Backend Unavailable / Offline Banner -->
+      <div id="conn-banner" class="conn-banner">
+        ⚠️ <strong>Backend unavailable:</strong> SmartRoute routing engine is unreachable. Live calculations require
+        server connection.
+      </div>
+
+      <!-- Status bar -->
+      <div id="status-bar">Ready. Select a demo scenario or enter node IDs.</div>
+
+      <!-- Scenario presets -->
+      <div class="section">
+        <h2>Incident Scenarios <span class="tip">(select condition)</span></h2>
+        <div class="preset-grid" id="preset-grid">
+          <button type="button" class="preset-btn active" id="preset-normal" onclick="selectScenario('normal')">🟢
+            Normal<br>conditions</button>
+          <button type="button" class="preset-btn" id="preset-road_closure" onclick="selectScenario('road_closure')">🔴
+            Road<br>closure</button>
+          <button type="button" class="preset-btn" id="preset-flash_flood" onclick="selectScenario('flash_flood')">🌊
+            Flash<br>flood</button>
+          <button type="button" class="preset-btn" id="preset-access_restriction"
+            onclick="selectScenario('access_restriction')">🚧 Access<br>restriction</button>
+          <button type="button" class="preset-btn" id="preset-congestion_spike"
+            onclick="selectScenario('congestion_spike')">🟠 Congestion<br>spike</button>
+        </div>
+
+        <!-- Active scenario summary card -->
+        <div class="scenario-info-card" id="scenario-info-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;">Selected
+              Scenario:</span>
+            <span id="scenario-info-badge"
+              style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:#1e3a5f;color:#93c5fd;font-weight:600;">Active</span>
+          </div>
+          <div class="scenario-info-title" id="scenario-info-title">🟢 Normal conditions</div>
+          <div class="scenario-info-detail" id="scenario-info-detail">
+            Standard traffic flow across Indiranagar. Free-flow baseline route calculation with no incident blocks.
+          </div>
+          <div class="displayed-scenario-row" id="displayed-scenario-row">
+            <span class="key">Displayed Route:</span>
+            <span class="val" id="displayed-scenario-val">None (not calculated)</span>
+          </div>
+        </div>
+
+        <!-- Separate action to load example trip -->
+        <button type="button" class="btn btn-secondary" id="load-example-btn" onclick="loadExampleTrip()">
+          📍 Load Verified Example Trip
+        </button>
+        <p class="tip">Selecting a scenario applies to your active trip points. Loading an example trip sets verified
+          origin/destination nodes for demonstrating this scenario.</p>
+      </div>
+
+      <!-- Route section -->
+      <div class="section">
+        <h2>Route Planner</h2>
+
+        <!-- Explicit map picking controls -->
+        <div class="picker-grid">
+          <button type="button" class="picker-btn" id="pick-src-btn" onclick="togglePicker('src')">
+            🟢 Choose Source on Map
+          </button>
+          <button type="button" class="picker-btn" id="pick-dst-btn" onclick="togglePicker('dst')">
+            🔴 Choose Dest on Map
+          </button>
+        </div>
+        <div id="picker-status" class="picker-status"></div>
+
+        <label for="src-input">Source Node ID</label>
+        <input type="number" id="src-input" value="253179982" placeholder="e.g. 253179982"
+          oninput="onInputChanged('src')" />
+
+        <label for="dst-input">Destination Node ID</label>
+        <input type="number" id="dst-input" value="736207607" placeholder="e.g. 736207607"
+          oninput="onInputChanged('dst')" />
+
+        <label for="algo-select">Algorithm</label>
+        <select id="algo-select" onchange="onConditionsChange()">
+          <option value="astar">A* (Faster — recommended)</option>
+          <option value="dijkstra">Dijkstra</option>
+        </select>
+
+        <button class="btn btn-primary" id="find-route-btn" onclick="findRoute()">
+          🗺 Find Safe Route
+        </button>
+        <button class="btn btn-secondary" onclick="clearRoute()">✕ Clear Route</button>
+        <p class="tip">💡 Use "Choose on Map" buttons to place points by clicking the map, even when IDs are filled.</p>
+      </div>
+
+      <!-- Time & Weather section -->
+      <div class="section">
+        <h2>Traffic Conditions</h2>
+
+        <div id="hour-label">⏰ 08:00</div>
+        <input type="range" id="hour-slider" min="0" max="23" value="8" oninput="onHourChange(this.value)"
+          aria-label="Hour of the day" />
+
+        <label for="weather-select">Weather</label>
+        <select id="weather-select" onchange="onConditionsChange()">
+          <option value="Clear">☀️ Clear</option>
+          <option value="Clouds">🌤 Cloudy</option>
+          <option value="Rain">🌧 Rain</option>
+          <option value="Drizzle">🌦 Drizzle</option>
+          <option value="Fog">🌫 Fog</option>
+          <option value="Mist">🌁 Mist</option>
+          <option value="Haze">😶‍🌫️ Haze</option>
+        </select>
+
+        <label for="scenario-select">Emergency Scenario <span class="tip">(simulated)</span></label>
+        <select id="scenario-select" onchange="onDropdownScenarioChange(this.value)">
+          <option value="normal">Normal conditions</option>
+          <option value="road_closure">Road closure — 100 Feet Road</option>
+          <option value="flash_flood">Flash flood — Swamy Vivekananda Road</option>
+          <option value="access_restriction">Emergency access restriction — 11th Main Road</option>
+          <option value="congestion_spike">Congestion spike — 80 Feet Road</option>
+        </select>
+
+        <label for="priority-select">Route Profile</label>
+        <select id="priority-select" onchange="onConditionsChange()">
+          <option value="standard">Standard</option>
+          <option value="emergency">Emergency response</option>
+        </select>
+        <p class="tip">Emergency profile adds 1.25× extra penalty on model-predicted high-congestion roads.</p>
+      </div>
+
+      <!-- Layers section -->
+      <div class="section">
+        <h2>Map Layers</h2>
+        <div class="toggle-row">
+          <span>🔥 Traffic Heatmap</span>
+          <label class="toggle" aria-label="Toggle traffic heatmap layer">
+            <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Stale warning banner -->
+      <div id="stale-banner" class="stale-banner"></div>
+
+      <!-- Result panel -->
+      <div id="result-panel">
+        <h2 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
+                 letter-spacing:1px;color:#94a3b8;margin-bottom:12px;">
+          Route Result
+        </h2>
+        <div id="result-scenario-banner"
+          style="background:#0f172a;border:1px solid #3b82f6;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:0.75rem;">
+          <div style="color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;">Displayed Route
+            Scenario</div>
+          <div id="result-scenario-name" style="font-weight:700;color:#60a5fa;margin-top:2px;"></div>
+        </div>
+        <div id="congestion-badge-container"></div>
+        <div class="stat-grid" id="stats-grid"></div>
+        <div id="incident-panel">
+          <div class="incident-header" id="incident-header"></div>
+          <div class="incident-body" id="incident-body"></div>
+        </div>
+        <p id="congestion-desc" style="font-size:0.75rem;color:#64748b;margin-top:8px;"></p>
+      </div>
     </div>
-    <div id="picker-status" class="picker-status"></div>
+  </aside>
 
-    <label>Source Node ID</label>
-    <input type="number" id="src-input" value="253179982" placeholder="e.g. 253179982" oninput="onInputChanged('src')" />
+  <!-- Map container -->
+  <div id="map"></div>
 
-    <label>Destination Node ID</label>
-    <input type="number" id="dst-input" value="736207607" placeholder="e.g. 736207607" oninput="onInputChanged('dst')" />
+  <script>
+    const API_BASE = '';
+    const DEFAULT_CENTER = [12.9784, 77.6408];
+    const DEFAULT_ZOOM = 14;
 
-    <label>Algorithm</label>
-    <select id="algo-select" onchange="onConditionsChange()">
-      <option value="astar">A* (Faster — recommended)</option>
-      <option value="dijkstra">Dijkstra</option>
-    </select>
+    // ── Scenario presets ── verified node pairs for each demo scenario ──────────
+    const PRESETS = {
+      normal: {
+        src: 253179982, dst: 736207607,
+        srcLat: 12.9812376, srcLon: 77.6460148,
+        dstLat: 12.9829234, dstLon: 77.6405761,
+        priority: 'standard'
+      },
+      road_closure: {
+        src: 253179982, dst: 736207607,
+        srcLat: 12.9812376, srcLon: 77.6460148,
+        dstLat: 12.9829234, dstLon: 77.6405761,
+        priority: 'standard'
+      },
+      flash_flood: {
+        src: 253179982, dst: 12692472176,
+        srcLat: 12.9812376, srcLon: 77.6460148,
+        dstLat: 12.9840371, dstLon: 77.6405308,
+        priority: 'standard'
+      },
+      access_restriction: {
+        src: 253179991, dst: 4202336813,
+        srcLat: 12.9709660, srcLon: 77.6473157,
+        dstLat: 12.9708713, dstLon: 77.6436867,
+        priority: 'emergency'
+      },
+      congestion_spike: {
+        src: 421262977, dst: 253179982,
+        srcLat: 12.9758272, srcLon: 77.6467377,
+        dstLat: 12.9812376, dstLon: 77.6460148,
+        priority: 'emergency'
+      },
+    };
 
-    <button class="btn btn-primary" id="find-route-btn" onclick="findRoute()">
-      🗺 Find Safe Route
-    </button>
-    <button class="btn btn-secondary" onclick="clearRoute()">✕ Clear Route</button>
-    <p class="tip">💡 Use "Choose on Map" buttons to place points by clicking the map, even when IDs are filled.</p>
-  </div>
+    const SCENARIO_INFO = {
+      normal: {
+        name: '🟢 Normal conditions',
+        target: 'None',
+        detail: 'Standard traffic flow across Indiranagar. Free-flow baseline route calculation with no incident blocks.'
+      },
+      road_closure: {
+        name: '🔴 Road closure',
+        target: '100 Feet Road',
+        detail: '100 Feet Road segments are set to weight = -1 (strictly impassable). Router must navigate via parallel avenues.'
+      },
+      flash_flood: {
+        name: '🌊 Flash flood',
+        target: 'Swamy Vivekananda Road',
+        detail: 'Simulated waterlogging along Swamy Vivekananda Road. Corridors are marked impassable (weight = -1).'
+      },
+      access_restriction: {
+        name: '🚧 Access restriction',
+        target: '11th Main Road',
+        detail: 'Emergency access restriction applied to 11th Main Road (weight = -1) to keep narrow corridors clear.'
+      },
+      congestion_spike: {
+        name: '🟠 Congestion spike',
+        target: '80 Feet Road',
+        detail: 'Simulated 2.5× congestion multiplier applied to 80 Feet Road. Router diverts around bottlenecks when viable competitive paths exist.'
+      }
+    };
 
-  <!-- Time & Weather section -->
-  <div class="section">
-    <h2>Traffic Conditions</h2>
+    // ── State ──────────────────────────────────────────────────────────────────
+    let map, routeLayer, heatmapLayer, incidentLayer, markerSrc, markerDst;
+    let currentHour = 8;
+    let currentWeather = 'Clear';
+    let currentScenario = 'normal';
+    let activePicker = null; // 'src' | 'dst' | null
+    let isRouteStale = false;
+    let activeRouteRequestId = 0;
+    let activeRouteAbortController = null;
+    let displayedRouteScenario = null;
+    let currentSheetState = 'half'; // 'peek' | 'half' | 'full'
+    let isBackendOnline = true;
 
-    <div id="hour-label">⏰ 08:00</div>
-    <input type="range" id="hour-slider" min="0" max="23" value="8"
-           oninput="onHourChange(this.value)" />
+    // ── Leaflet init ──────────────────────────────────────────────────────────
+    map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-    <label>Weather</label>
-    <select id="weather-select" onchange="onConditionsChange()">
-      <option value="Clear">☀️ Clear</option>
-      <option value="Clouds">🌤 Cloudy</option>
-      <option value="Rain">🌧 Rain</option>
-      <option value="Drizzle">🌦 Drizzle</option>
-      <option value="Fog">🌫 Fog</option>
-      <option value="Mist">🌁 Mist</option>
-      <option value="Haze">😶‍🌫️ Haze</option>
-    </select>
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-    <label>Emergency Scenario <span class="tip">(simulated)</span></label>
-    <select id="scenario-select" onchange="onDropdownScenarioChange(this.value)">
-      <option value="normal">Normal conditions</option>
-      <option value="road_closure">Road closure — 100 Feet Road</option>
-      <option value="flash_flood">Flash flood — Swamy Vivekananda Road</option>
-      <option value="access_restriction">Emergency access restriction — 11th Main Road</option>
-      <option value="congestion_spike">Congestion spike — 80 Feet Road</option>
-    </select>
+    // Map legend (Collapsible on mobile, accessible)
+    const legend = L.control({ position: 'bottomright' });
+    let isLegendExpanded = window.innerWidth > 768;
 
-    <label>Route Profile</label>
-    <select id="priority-select" onchange="onConditionsChange()">
-      <option value="standard">Standard</option>
-      <option value="emergency">Emergency response</option>
-    </select>
-    <p class="tip">Emergency profile adds 1.25× extra penalty on model-predicted high-congestion roads.</p>
-  </div>
+    legend.onAdd = () => {
+      const div = L.DomUtil.create('div', 'map-legend' + (isLegendExpanded ? ' expanded' : ''));
+      div.id = 'map-legend-container';
+      div.setAttribute('role', 'region');
+      div.setAttribute('aria-label', 'Map Legend');
 
-  <!-- Layers section -->
-  <div class="section">
-    <h2>Map Layers</h2>
-    <div class="toggle-row">
-      <span>🔥 Traffic Heatmap</span>
-      <label class="toggle">
-        <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()" />
-        <span class="slider"></span>
-      </label>
-    </div>
-  </div>
+      div.innerHTML = `
+        <div class="legend-header" id="legend-toggle-btn" role="button" tabindex="0"
+             aria-expanded="${isLegendExpanded}" aria-controls="map-legend-content" title="Tap to toggle legend">
+          <div class="legend-title">
+            <span>🗺️ Legend</span>
+            <span class="legend-badge-summary" id="legend-summary-tag">Normal</span>
+          </div>
+          <span class="legend-chevron" id="legend-chevron-icon" aria-hidden="true">▾</span>
+        </div>
+        <div class="legend-content" id="map-legend-content">
+          <div class="legend-row"><div class="legend-dot" style="background:#22c55e"></div>Low — Free flow</div>
+          <div class="legend-row"><div class="legend-dot" style="background:#f59e0b"></div>Medium — Moderate</div>
+          <div class="legend-row"><div class="legend-dot" style="background:#ef4444"></div>High — Congested</div>
+          <div class="legend-row"><div class="legend-dot" style="background:#2563eb;border:1px solid #93c5fd"></div>Selected Route</div>
+          <div id="legend-incident-slot"></div>
+          <div class="legend-sim-tag">⚠️ SIMULATED SCENARIO</div>
+        </div>
+      `;
 
-  <!-- Stale warning banner -->
-  <div id="stale-banner" class="stale-banner"></div>
+      // Prevent map clicks/drags through the legend box
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
 
-  <!-- Result panel -->
-  <div id="result-panel">
-    <h2 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
-               letter-spacing:1px;color:#94a3b8;margin-bottom:12px;">
-      Route Result
-    </h2>
-    <div id="result-scenario-banner" style="background:#0f172a;border:1px solid #3b82f6;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:0.75rem;">
-      <div style="color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;">Displayed Route Scenario</div>
-      <div id="result-scenario-name" style="font-weight:700;color:#60a5fa;margin-top:2px;"></div>
-    </div>
-    <div id="congestion-badge-container"></div>
-    <div class="stat-grid" id="stats-grid"></div>
-    <div id="incident-panel">
-      <div class="incident-header" id="incident-header"></div>
-      <div class="incident-body" id="incident-body"></div>
-    </div>
-    <p id="congestion-desc" style="font-size:0.75rem;color:#64748b;margin-top:8px;"></p>
-  </div>
-</aside>
+      return div;
+    };
+    legend.addTo(map);
 
-<!-- Map container -->
-<div id="map"></div>
+    function toggleLegend(forceState) {
+      const container = document.getElementById('map-legend-container');
+      const toggleBtn = document.getElementById('legend-toggle-btn');
+      if (!container || !toggleBtn) return;
 
-<script>
-  const API_BASE = '';
-  const DEFAULT_CENTER = [12.9784, 77.6408];
-  const DEFAULT_ZOOM   = 14;
-
-  // ── Scenario presets ── verified node pairs for each demo scenario ──────────
-  // Each pair is confirmed reachable in the bundled Indiranagar graph.
-  // Road closure, flood, and access restriction pairs are chosen so the named road
-  // lies on the primary path, forcing the router onto an alternate route.
-  // Congestion spike uses an origin/destination that diverts to an alternate
-  // corridor when 80 Feet Road is spiked with a 2.5× multiplier.
-  const PRESETS = {
-    normal: {
-      src: 253179982,  dst: 736207607,
-      srcLat: 12.9812376, srcLon: 77.6460148,
-      dstLat: 12.9829234, dstLon: 77.6405761,
-      priority: 'standard'
-    },
-    road_closure: {
-      src: 253179982,  dst: 736207607,
-      srcLat: 12.9812376, srcLon: 77.6460148,
-      dstLat: 12.9829234, dstLon: 77.6405761,
-      priority: 'standard'
-    },
-    flash_flood: {
-      src: 253179982,  dst: 12692472176,
-      srcLat: 12.9812376, srcLon: 77.6460148,
-      dstLat: 12.9840371, dstLon: 77.6405308,
-      priority: 'standard'
-    },
-    access_restriction: {
-      src: 253179991,  dst: 4202336813,
-      srcLat: 12.9709660, srcLon: 77.6473157,
-      dstLat: 12.9708713, dstLon: 77.6436867,
-      priority: 'emergency'
-    },
-    congestion_spike: {
-      src: 421262977,  dst: 253179982,
-      srcLat: 12.9758272, srcLon: 77.6467377,
-      dstLat: 12.9812376, dstLon: 77.6460148,
-      priority: 'emergency'
-    },
-  };
-
-  const SCENARIO_INFO = {
-    normal: {
-      name: '🟢 Normal conditions',
-      target: 'None',
-      detail: 'Standard traffic flow across Indiranagar. Free-flow baseline route calculation with no incident blocks.'
-    },
-    road_closure: {
-      name: '🔴 Road closure',
-      target: '100 Feet Road',
-      detail: '100 Feet Road segments are set to weight = -1 (strictly impassable). Router must navigate via parallel avenues.'
-    },
-    flash_flood: {
-      name: '🌊 Flash flood',
-      target: 'Swamy Vivekananda Road',
-      detail: 'Simulated waterlogging along Swamy Vivekananda Road. Corridors are marked impassable (weight = -1).'
-    },
-    access_restriction: {
-      name: '🚧 Access restriction',
-      target: '11th Main Road',
-      detail: 'Emergency access restriction applied to 11th Main Road (weight = -1) to keep narrow corridors clear.'
-    },
-    congestion_spike: {
-      name: '🟠 Congestion spike',
-      target: '80 Feet Road',
-      detail: 'Simulated 2.5× congestion multiplier applied to 80 Feet Road. Router diverts around bottlenecks when viable competitive paths exist.'
-    }
-  };
-
-  // ── State ──────────────────────────────────────────────────────────────────
-  let map, routeLayer, heatmapLayer, markerSrc, markerDst;
-  let currentHour = 8;
-  let currentWeather = 'Clear';
-  let currentScenario = 'normal';
-  let activePicker = null; // 'src' | 'dst' | null
-  let isRouteStale = false;
-  let activeRouteRequestId = 0;
-  let activeRouteAbortController = null;
-  let displayedRouteScenario = null;
-
-  // ── Leaflet init ──────────────────────────────────────────────────────────
-  map = L.map('map', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
-
-  // Map legend
-  const legend = L.control({ position: 'bottomright' });
-  legend.onAdd = () => {
-    const div = L.DomUtil.create('div', 'map-legend');
-    div.innerHTML = `<h3>CONGESTION LEVEL</h3>
-      <div class="legend-row"><div class="legend-dot" style="background:#22c55e"></div>Low — Free flow</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#f59e0b"></div>Medium — Moderate</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#ef4444"></div>High — Congested</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#60a5fa"></div>Selected Route</div>
-      <div style="margin-top:6px;font-size:0.65rem;color:#64748b;">⚠️ Simulated data only</div>`;
-    return div;
-  };
-  legend.addTo(map);
-
-  // ── Scenario selection & Example Trip Loader ───────────────────────────────
-  function selectScenario(scenarioKey) {
-    if (!SCENARIO_INFO[scenarioKey]) return;
-    currentScenario = scenarioKey;
-    document.getElementById('scenario-select').value = scenarioKey;
-
-    // Highlight active preset button
-    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-    const btn = document.getElementById('preset-' + scenarioKey);
-    if (btn) btn.classList.add('active');
-
-    // Update scenario info card
-    const info = SCENARIO_INFO[scenarioKey];
-    document.getElementById('scenario-info-title').textContent = info.name;
-    document.getElementById('scenario-info-detail').textContent =
-      `${info.detail} (Target road: ${info.target})`;
-
-    // Preserve existing origin/destination. Immediately recalculate if both nodes exist.
-    const src = document.getElementById('src-input').value.trim();
-    const dst = document.getElementById('dst-input').value.trim();
-    if (src && dst) {
-      markRouteStale(`Scenario switched to "${info.name}". Recalculating with current nodes (${src} → ${dst})…`);
-      findRoute();
-    } else {
-      markRouteStale(`Scenario switched to "${info.name}". Source & destination preserved.`);
-      setStatus(`Active scenario: ${info.name}. Please enter source and destination nodes.`);
-    }
-  }
-
-  function onDropdownScenarioChange(val) {
-    selectScenario(val);
-  }
-
-  function loadExampleTrip() {
-    const p = PRESETS[currentScenario];
-    if (!p) return;
-    document.getElementById('src-input').value = p.src;
-    document.getElementById('dst-input').value = p.dst;
-    document.getElementById('priority-select').value = p.priority;
-
-    placeMarker('src', p.srcLat, p.srcLon, p.src);
-    placeMarker('dst', p.dstLat, p.dstLon, p.dst);
-
-    map.fitBounds([[p.srcLat, p.srcLon], [p.dstLat, p.dstLon]], { padding: [60, 60] });
-
-    markRouteStale(`Loaded verified example trip for ${SCENARIO_INFO[currentScenario].name}: ${p.src} → ${p.dst}. Calculating…`);
-    findRoute();
-  }
-
-  // ── Explicit Map Picker Controls ──────────────────────────────────────────
-  function togglePicker(type) {
-    if (activePicker === type) {
-      activePicker = null;
-    } else {
-      activePicker = type;
-    }
-    updatePickerUI();
-  }
-
-  function updatePickerUI() {
-    const srcBtn = document.getElementById('pick-src-btn');
-    const dstBtn = document.getElementById('pick-dst-btn');
-    const statusEl = document.getElementById('picker-status');
-
-    srcBtn.classList.remove('active-src');
-    dstBtn.classList.remove('active-dst');
-
-    if (activePicker === 'src') {
-      srcBtn.classList.add('active-src');
-      statusEl.style.display = 'block';
-      statusEl.innerHTML = '👉 <strong>Click anywhere on the map</strong> to set Source node.';
-    } else if (activePicker === 'dst') {
-      dstBtn.classList.add('active-dst');
-      statusEl.style.display = 'block';
-      statusEl.innerHTML = '👉 <strong>Click anywhere on the map</strong> to set Destination node.';
-    } else {
-      statusEl.style.display = 'none';
-      statusEl.innerHTML = '';
-    }
-  }
-
-  // ── Click to pick nodes on map ─────────────────────────────────────────────
-  map.on('click', async (e) => {
-    const { lat, lng } = e.latlng;
-    setStatus('Looking up nearest road network node…', 'loading');
-    const res = await apiFetch(`/nodes/nearest?lat=${lat}&lon=${lng}`);
-
-    if (!res || res.error || res.detail) {
-      const err = res?.error || res?.detail?.message || 'Selected location is outside the Indiranagar graph area.';
-      setStatus(`⚠️ ${err}`, 'error');
-      return;
-    }
-
-    // Changing trip points invalidates any in-flight route calculation
-    activeRouteRequestId++;
-    if (activeRouteAbortController) {
-      try { activeRouteAbortController.abort(); } catch (e) {}
-      activeRouteAbortController = null;
-    }
-    const btn = document.getElementById('find-route-btn');
-    if (btn) btn.disabled = false;
-
-    const dispValEl = document.getElementById('displayed-scenario-val');
-    if (dispValEl) {
-      dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Point changed)</span>';
-    }
-
-    if (activePicker === 'src') {
-      document.getElementById('src-input').value = res.node_id;
-      placeMarker('src', res.lat, res.lon, res.node_id);
-      activePicker = null;
-      updatePickerUI();
-      markRouteStale(`Source node set to ${res.node_id}.`);
-      setStatus(`🟢 Source set to node ${res.node_id}.`, 'success');
-    } else if (activePicker === 'dst') {
-      document.getElementById('dst-input').value = res.node_id;
-      placeMarker('dst', res.lat, res.lon, res.node_id);
-      activePicker = null;
-      updatePickerUI();
-      markRouteStale(`Destination node set to ${res.node_id}.`);
-      setStatus(`🔴 Destination set to node ${res.node_id}.`, 'success');
-    } else {
-      // Direct click when no explicit picker is toggled
-      const srcVal = document.getElementById('src-input').value.trim();
-      const dstVal = document.getElementById('dst-input').value.trim();
-
-      if (!srcVal) {
-        document.getElementById('src-input').value = res.node_id;
-        placeMarker('src', res.lat, res.lon, res.node_id);
-        markRouteStale(`Source node set to ${res.node_id}.`);
-        setStatus(`🟢 Source set to node ${res.node_id}. Click map again to pick destination.`, 'success');
-      } else if (!dstVal) {
-        document.getElementById('dst-input').value = res.node_id;
-        placeMarker('dst', res.lat, res.lon, res.node_id);
-        markRouteStale(`Destination node set to ${res.node_id}.`);
-        setStatus(`🔴 Destination set to node ${res.node_id}. Click "Find Safe Route".`, 'success');
+      if (typeof forceState === 'boolean') {
+        isLegendExpanded = forceState;
       } else {
-        // Both fields filled: update destination by default and notify presenter
-        document.getElementById('dst-input').value = res.node_id;
-        placeMarker('dst', res.lat, res.lon, res.node_id);
-        markRouteStale(`Destination updated to node ${res.node_id}.`);
-        setStatus(`🔴 Destination updated to node ${res.node_id}. Use "Choose Source on Map" to update source.`, 'success');
+        isLegendExpanded = !isLegendExpanded;
       }
-    }
-  });
 
-  function placeMarker(type, lat, lon, nodeId) {
-    const color = type === 'src' ? '#22c55e' : '#ef4444';
-    const label = type === 'src' ? '🟢 Source' : '🔴 Destination';
-    const icon = L.divIcon({
-      html: `<div style="background:${color};width:16px;height:16px;
-                border-radius:50%;border:3px solid white;box-shadow:0 0 6px ${color}"></div>`,
-      iconSize: [16, 16], iconAnchor: [8, 8]
+      if (isLegendExpanded) {
+        container.classList.add('expanded');
+      } else {
+        container.classList.remove('expanded');
+      }
+      toggleBtn.setAttribute('aria-expanded', isLegendExpanded ? 'true' : 'false');
+    }
+
+    // Accessible toggle listeners for legend
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#legend-toggle-btn')) {
+        toggleLegend();
+      }
     });
-    if (type === 'src') {
-      if (markerSrc) markerSrc.remove();
-      markerSrc = L.marker([lat, lon], { icon }).addTo(map)
-                   .bindPopup(`<b>${label}</b><br>Node ID: ${nodeId}`);
-    } else {
-      if (markerDst) markerDst.remove();
-      markerDst = L.marker([lat, lon], { icon }).addTo(map)
-                   .bindPopup(`<b>${label}</b><br>Node ID: ${nodeId}`);
-    }
-  }
-
-  // ── Input synchronization & Stale State ────────────────────────────────────
-  function onInputChanged(type) {
-    // Invalidate in-flight calculation so outdated response won't show for updated node inputs
-    activeRouteRequestId++;
-    if (activeRouteAbortController) {
-      try { activeRouteAbortController.abort(); } catch (e) {}
-      activeRouteAbortController = null;
-    }
-    const btn = document.getElementById('find-route-btn');
-    if (btn) btn.disabled = false;
-
-    markRouteStale(`Node ID manually updated.`);
-    const dispValEl = document.getElementById('displayed-scenario-val');
-    if (dispValEl) {
-      dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Node changed)</span>';
-    }
-  }
-
-  function markRouteStale(reason) {
-    isRouteStale = true;
-    const banner = document.getElementById('stale-banner');
-    if (banner) {
-      banner.style.display = 'block';
-      banner.innerHTML = `⚠️ <strong>Route stale:</strong> ${reason || 'Parameters changed.'} Click <strong>Find Safe Route</strong> to recalculate.`;
-    }
-    if (routeLayer) {
-      routeLayer.eachLayer(layer => {
-        if (layer.setStyle) {
-          layer.setStyle({ color: '#64748b', opacity: 0.35, dashArray: '4, 8' });
-        }
-      });
-    }
-  }
-
-  function clearRouteStale() {
-    isRouteStale = false;
-    const banner = document.getElementById('stale-banner');
-    if (banner) {
-      banner.style.display = 'none';
-      banner.innerHTML = '';
-    }
-  }
-
-  // ── API helpers ────────────────────────────────────────────────────────────
-  async function apiFetch(path, options = {}) {
-    try {
-      const r = await fetch(API_BASE + path, options);
-      if (!r.ok) {
-        let detail = r.statusText;
-        try { const j = await r.json(); detail = j.detail || j.message || detail; } catch {}
-        return { error: detail, status: r.status };
+    document.addEventListener('keydown', (e) => {
+      if (e.target.closest('#legend-toggle-btn') && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        toggleLegend();
       }
-      return await r.json();
-    } catch (e) {
-      if (e.name === 'AbortError') {
-        return { aborted: true };
+    });
+
+    function updateLegend(scenarioKey, data) {
+      const tag = document.getElementById('legend-summary-tag');
+      const slot = document.getElementById('legend-incident-slot');
+      if (!tag || !slot) return;
+
+      const info = SCENARIO_INFO[scenarioKey] || { name: 'Normal' };
+      const shortLabel = {
+        normal: 'Normal',
+        road_closure: 'Closed',
+        flash_flood: 'Flood',
+        access_restriction: 'Restricted',
+        congestion_spike: 'Spike'
+      }[scenarioKey] || info.name;
+      tag.textContent = shortLabel;
+
+      let incidentHtml = '';
+      if (scenarioKey === 'road_closure') {
+        const segCount = data?.affected_segments || 15;
+        incidentHtml = `<div class="legend-row" style="color:#fca5a5"><div class="legend-line" style="background:#ef4444;border:1px dashed #fff"></div>⛔ 100 Feet Rd (${segCount} segs)</div>`;
+      } else if (scenarioKey === 'flash_flood') {
+        const segCount = data?.affected_segments || 10;
+        incidentHtml = `<div class="legend-row" style="color:#7dd3fc"><div class="legend-line" style="background:#38bdf8;border:1px dashed #fff"></div>🌊 Vivekananda Rd (${segCount} segs)</div>`;
+      } else if (scenarioKey === 'access_restriction') {
+        const segCount = data?.affected_segments || 22;
+        incidentHtml = `<div class="legend-row" style="color:#fde68a"><div class="legend-line" style="background:#f59e0b;border:1px dashed #fff"></div>🚧 11th Main Rd (${segCount} segs)</div>`;
+      } else if (scenarioKey === 'congestion_spike') {
+        const segCount = data?.affected_segments || 34;
+        incidentHtml = `<div class="legend-row" style="color:#fdba74"><div class="legend-line" style="background:#ea580c;border:1px dashed #fff"></div>⏱️ 80 Feet Rd (${segCount} segs)</div>`;
       }
-      return { error: e.message };
-    }
-  }
 
-  function setStatus(msg, type = '') {
-    const el = document.getElementById('status-bar');
-    el.className = type;
-    el.innerHTML = type === 'loading'
-      ? `<span class="spinner"></span>${msg}`
-      : msg;
-  }
-
-  // ── Hour slider ───────────────────────────────────────────────────────────
-  function onHourChange(val) {
-    currentHour = parseInt(val);
-    const h = String(currentHour).padStart(2, '0');
-    document.getElementById('hour-label').textContent = `⏰ ${h}:00`;
-    onConditionsChange();
-  }
-
-  function onConditionsChange() {
-    // Invalidate in-flight calculation
-    activeRouteRequestId++;
-    if (activeRouteAbortController) {
-      try { activeRouteAbortController.abort(); } catch (e) {}
-      activeRouteAbortController = null;
-    }
-    const btn = document.getElementById('find-route-btn');
-    if (btn) btn.disabled = false;
-
-    currentWeather = document.getElementById('weather-select').value;
-    markRouteStale('Traffic conditions updated.');
-    const dispValEl = document.getElementById('displayed-scenario-val');
-    if (dispValEl && displayedRouteScenario) {
-      dispValEl.innerHTML = `<span style="color:#f59e0b">⚠️ Stale (${SCENARIO_INFO[displayedRouteScenario]?.name || displayedRouteScenario})</span>`;
-    }
-    if (document.getElementById('heatmap-toggle').checked) {
-      loadHeatmap();
-    }
-  }
-
-  // ── Find Route ────────────────────────────────────────────────────
-  async function findRoute() {
-    const src      = document.getElementById('src-input').value.trim();
-    const dst      = document.getElementById('dst-input').value.trim();
-    const algo     = document.getElementById('algo-select').value;
-    const scenario = document.getElementById('scenario-select').value;
-    const priority = document.getElementById('priority-select').value;
-
-    if (!src || !dst) {
-      setStatus('⚠️ Please enter both source and destination node IDs.', 'error');
-      return;
-    }
-    if (src === dst) {
-      setStatus('⚠️ Source and destination must be different nodes.', 'error');
-      return;
+      slot.innerHTML = incidentHtml;
     }
 
-    // Cancel any previous in-flight request
-    if (activeRouteAbortController) {
-      try { activeRouteAbortController.abort(); } catch (e) {}
-    }
-    activeRouteAbortController = new AbortController();
-    const currentSignal = activeRouteAbortController.signal;
-    const requestId = ++activeRouteRequestId;
+    // ── Scenario incident overlay on map ──────────────────────────────────────
+    async function updateScenarioOverlay(scenarioKey) {
+      if (incidentLayer) {
+        incidentLayer.remove();
+        incidentLayer = null;
+      }
 
-    const btn = document.getElementById('find-route-btn');
-    btn.disabled = true;
-
-    const scenarioName = SCENARIO_INFO[scenario]?.name || scenario;
-    setStatus(`Computing safe route with ${algo.toUpperCase()} for ${scenarioName}…`, 'loading');
-
-    // Keep stale warning banner visible while request is running
-    markRouteStale(`Calculating route for ${scenarioName} (previous route is stale)…`);
-    const dispValEl = document.getElementById('displayed-scenario-val');
-    if (dispValEl) {
-      dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Recalculating…)</span>';
-    }
-
-    try {
-      const url = `/route?src=${encodeURIComponent(src)}&dst=${encodeURIComponent(dst)}&hour=${currentHour}`
-                + `&weather=${encodeURIComponent(currentWeather)}&algo=${encodeURIComponent(algo)}`
-                + `&scenario=${encodeURIComponent(scenario)}&priority=${encodeURIComponent(priority)}`;
-      const data = await apiFetch(url, { signal: currentSignal });
-
-      // If aborted or superseded by a newer request, discard silently
-      if (data?.aborted || requestId !== activeRouteRequestId) {
+      if (scenarioKey === 'normal') {
+        updateLegend('normal');
         return;
       }
 
-      if (!data || data.error || data.detail) {
-        let msg = data?.error;
-        let tip = '';
-        if (data?.detail) {
-          if (typeof data.detail === 'object') {
-            msg = data.detail.message || JSON.stringify(data.detail);
-            tip = data.detail.tip ? `<br><span style="color:#cbd5e1;font-size:0.75rem">${data.detail.tip}</span>` : '';
-          } else {
-            msg = data.detail;
-          }
+      try {
+        const data = await apiFetch(`/scenarios/overlay?scenario=${encodeURIComponent(scenarioKey)}`);
+        if (!data || !data.features || data.features.length === 0) {
+          updateLegend(scenarioKey);
+          return;
         }
-        msg = msg || 'Failed to get route';
 
-        // On failure, do not leave the old route looking current!
+        incidentLayer = L.layerGroup();
+        const condition = data.condition;
+        const allPoints = [];
+
+        // Distinguishable styling per incident type
+        let casingColor = '#7f1d1d', lineColor = '#ef4444', dashPattern = '6, 6', badgeClass = 'pill-closure', badgeIcon = '⛔';
+        if (condition === 'flooded') {
+          casingColor = '#0369a1'; lineColor = '#38bdf8'; dashPattern = '10, 5'; badgeClass = 'pill-flood'; badgeIcon = '🌊';
+        } else if (condition === 'inaccessible') {
+          casingColor = '#78350f'; lineColor = '#f59e0b'; dashPattern = '8, 6'; badgeClass = 'pill-restriction'; badgeIcon = '🚧';
+        } else if (condition === 'congested') {
+          casingColor = '#7c2d12'; lineColor = '#ea580c'; dashPattern = '4, 4'; badgeClass = 'pill-spike'; badgeIcon = '⏱️';
+        }
+
+        data.features.forEach(feat => {
+          const coords = feat.geometry.coordinates.map(c => [c[1], c[0]]); // Leaflet uses [lat, lon]
+          coords.forEach(pt => allPoints.push(pt));
+
+          // Outer casing / glow
+          L.polyline(coords, {
+            color: casingColor,
+            weight: 9,
+            opacity: 0.65,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(incidentLayer);
+
+          // Inner styled dashed incident line
+          const poly = L.polyline(coords, {
+            color: lineColor,
+            weight: 5,
+            opacity: 0.95,
+            dashArray: dashPattern,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(incidentLayer);
+
+          const prop = feat.properties;
+          poly.bindPopup(
+            `<b>${badgeIcon} ${prop.name}</b><br>` +
+            `Incident: <strong>${data.label}</strong><br>` +
+            `Condition: <code>${condition || 'simulated'}</code><br>` +
+            `<div style="margin-top:4px;font-size:0.7rem;color:#f59e0b;">⚠️ SIMULATED INCIDENT · No live feed</div>`
+          );
+        });
+
+        // Place a representative badge marker near the midpoint of the corridor
+        if (allPoints.length > 0) {
+          const midIdx = Math.floor(allPoints.length / 2);
+          const midCoord = allPoints[midIdx];
+          const roadName = data.road_names?.[0] || 'Road Segment';
+          const badgeHtml = `<div class="incident-marker-pill ${badgeClass}">${badgeIcon} ${roadName} (${data.affected_segments} segs)</div>`;
+          const badgeIconObj = L.divIcon({
+            html: badgeHtml,
+            className: '',
+            iconAnchor: [60, 14]
+          });
+          L.marker(midCoord, { icon: badgeIconObj }).addTo(incidentLayer)
+            .bindPopup(`<b>${badgeIcon} ${data.label} (Simulated)</b><br>Target: ${roadName}<br>Affected: ${data.affected_segments} segments<br><span style="color:#f59e0b;font-size:0.7rem">⚠️ Simulated data</span>`);
+        }
+
+        incidentLayer.addTo(map);
+
+        // Keep active route line visually on top if present
+        if (routeLayer) {
+          routeLayer.bringToFront ? routeLayer.bringToFront() : routeLayer.addTo(map);
+        }
+
+        updateLegend(scenarioKey, data);
+      } catch (err) {
+        console.warn('Could not load scenario overlay:', err);
+        updateLegend(scenarioKey);
+      }
+    }
+
+    // Auto-resize Leaflet map on container size changes, viewport rotation, or resize
+    if (window.ResizeObserver) {
+      const mapObserver = new ResizeObserver(() => {
+        if (map) map.invalidateSize({ pan: false });
+      });
+      const mapEl = document.getElementById('map');
+      if (mapEl) mapObserver.observe(mapEl);
+    }
+
+    window.addEventListener('resize', () => {
+      if (map) map.invalidateSize({ pan: false });
+    });
+
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => { if (map) map.invalidateSize({ pan: false }); }, 150);
+      setTimeout(() => { if (map) map.invalidateSize({ pan: false }); }, 450);
+    });
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        if (map) map.invalidateSize({ pan: false });
+      });
+    }
+
+    // ── Mobile Bottom Sheet Management ────────────────────────────────────────
+    function setSheetState(state) {
+      currentSheetState = state;
+      const sidebar = document.getElementById('sidebar');
+      sidebar.setAttribute('data-sheet-state', state);
+
+      const toggleLabel = document.getElementById('sheet-toggle-label');
+      if (toggleLabel) {
+        if (state === 'peek') {
+          toggleLabel.textContent = 'Plan Route ▲';
+        } else if (state === 'half') {
+          toggleLabel.textContent = 'Expand ▲';
+        } else {
+          toggleLabel.textContent = 'Collapse ▼';
+        }
+      }
+
+      // Trigger map invalidation smoothly during & after CSS height transition
+      if (map) {
+        setTimeout(() => map.invalidateSize({ pan: false }), 150);
+        setTimeout(() => map.invalidateSize({ pan: false }), 320);
+      }
+    }
+
+    function cycleSheetState() {
+      if (currentSheetState === 'peek') {
+        setSheetState('half');
+      } else if (currentSheetState === 'half') {
+        setSheetState('full');
+      } else {
+        setSheetState('peek');
+      }
+    }
+
+    function updateSheetPeekSub(text) {
+      const el = document.getElementById('sheet-peek-sub');
+      if (el) el.textContent = text;
+    }
+
+    // Touch Drag Gestures on Handle Bar
+    (function initSheetTouchDrag() {
+      const handleBar = document.getElementById('sheet-handle-bar');
+      if (!handleBar) return;
+
+      let startY = 0;
+      let currentY = 0;
+      let isDragging = false;
+
+      handleBar.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          startY = e.touches[0].clientY;
+          currentY = startY;
+          isDragging = true;
+        }
+      }, { passive: true });
+
+      handleBar.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        currentY = e.touches[0].clientY;
+      }, { passive: true });
+
+      handleBar.addEventListener('touchend', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        const deltaY = currentY - startY;
+
+        // Swiped Up (> 40px)
+        if (deltaY < -40) {
+          if (currentSheetState === 'peek') setSheetState('half');
+          else if (currentSheetState === 'half') setSheetState('full');
+        }
+        // Swiped Down (> 40px)
+        else if (deltaY > 40) {
+          if (currentSheetState === 'full') setSheetState('half');
+          else if (currentSheetState === 'half') setSheetState('peek');
+        }
+      }, { passive: true });
+    })();
+
+    // ── Scenario selection & Example Trip Loader ───────────────────────────────
+    function selectScenario(scenarioKey) {
+      if (!SCENARIO_INFO[scenarioKey]) return;
+      currentScenario = scenarioKey;
+      document.getElementById('scenario-select').value = scenarioKey;
+
+      // Sync priority profile if preset defines one
+      if (PRESETS[scenarioKey]?.priority) {
+        document.getElementById('priority-select').value = PRESETS[scenarioKey].priority;
+      }
+
+      // Highlight active preset button
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('preset-' + scenarioKey);
+      if (btn) btn.classList.add('active');
+
+      // Update scenario info card
+      const info = SCENARIO_INFO[scenarioKey];
+      document.getElementById('scenario-info-title').textContent = info.name;
+      document.getElementById('scenario-info-detail').textContent =
+        `${info.detail} (Target road: ${info.target})`;
+
+      updateSheetPeekSub(`${info.name} · Active`);
+
+      // Update incident overlay on the map
+      updateScenarioOverlay(scenarioKey);
+
+      // Preserve existing origin/destination. Immediately recalculate if both nodes exist.
+      const src = document.getElementById('src-input').value.trim();
+      const dst = document.getElementById('dst-input').value.trim();
+      if (src && dst) {
+        markRouteStale(`Scenario switched to "${info.name}". Recalculating with current nodes (${src} → ${dst})…`);
+        findRoute();
+      } else {
+        markRouteStale(`Scenario switched to "${info.name}". Source & destination preserved.`);
+        setStatus(`Active scenario: ${info.name}. Please enter source and destination nodes.`);
+      }
+    }
+
+    function onDropdownScenarioChange(val) {
+      selectScenario(val);
+    }
+
+    function loadExampleTrip() {
+      const p = PRESETS[currentScenario];
+      if (!p) return;
+      document.getElementById('src-input').value = p.src;
+      document.getElementById('dst-input').value = p.dst;
+      document.getElementById('priority-select').value = p.priority;
+
+      placeMarker('src', p.srcLat, p.srcLon, p.src);
+      placeMarker('dst', p.dstLat, p.dstLon, p.dst);
+
+      // Responsive padding accounting for mobile bottom sheet
+      const bottomPad = window.innerWidth <= 768 ? (window.innerHeight * 0.45) : 60;
+      map.fitBounds([[p.srcLat, p.srcLon], [p.dstLat, p.dstLon]], {
+        paddingTopLeft: [40, 40],
+        paddingBottomRight: [40, bottomPad]
+      });
+
+      setStatus(`📍 Loaded verified trip for ${SCENARIO_INFO[currentScenario].name}: Node ${p.src} → Node ${p.dst}. (Endpoints updated). Calculating safe route…`, 'loading');
+      updateSheetPeekSub(`Trip: Node ${p.src} → ${p.dst}`);
+      markRouteStale(`Loaded verified example trip for ${SCENARIO_INFO[currentScenario].name}: Node ${p.src} → Node ${p.dst}. Calculating…`);
+      findRoute();
+    }
+
+    // ── Explicit Map Picker Controls ──────────────────────────────────────────
+    function togglePicker(type) {
+      if (activePicker === type) {
+        activePicker = null;
+      } else {
+        activePicker = type;
+        // On mobile, automatically collapse sheet to peek so map is clearly visible
+        if (window.innerWidth <= 768) {
+          setSheetState('peek');
+        }
+      }
+      updatePickerUI();
+    }
+
+    function updatePickerUI() {
+      const srcBtn = document.getElementById('pick-src-btn');
+      const dstBtn = document.getElementById('pick-dst-btn');
+      const statusEl = document.getElementById('picker-status');
+
+      srcBtn.classList.remove('active-src');
+      dstBtn.classList.remove('active-dst');
+
+      if (activePicker === 'src') {
+        srcBtn.classList.add('active-src');
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = '👉 <strong>Click anywhere on the map</strong> to set Source node.';
+        updateSheetPeekSub('🟢 Tap map to pick Source node');
+      } else if (activePicker === 'dst') {
+        dstBtn.classList.add('active-dst');
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = '👉 <strong>Click anywhere on the map</strong> to set Destination node.';
+        updateSheetPeekSub('🔴 Tap map to pick Destination node');
+      } else {
+        statusEl.style.display = 'none';
+        statusEl.innerHTML = '';
+      }
+    }
+
+    // ── Click to pick nodes on map ─────────────────────────────────────────────
+    map.on('click', async (e) => {
+      const { lat, lng } = e.latlng;
+      setStatus('Looking up nearest road network node…', 'loading');
+      const res = await apiFetch(`/nodes/nearest?lat=${lat}&lon=${lng}`);
+
+      if (!res || res.error || res.detail) {
+        const err = res?.error || res?.detail?.message || 'Selected location is outside the Indiranagar graph area.';
+        setStatus(`⚠️ ${err}`, 'error');
+        return;
+      }
+
+      // Changing trip points invalidates any in-flight route calculation
+      activeRouteRequestId++;
+      if (activeRouteAbortController) {
+        try { activeRouteAbortController.abort(); } catch (e) { }
+        activeRouteAbortController = null;
+      }
+
+      const btn = document.getElementById('find-route-btn');
+      if (btn) btn.disabled = false;
+
+      const dispValEl = document.getElementById('displayed-scenario-val');
+      if (dispValEl) {
+        dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Point changed)</span>';
+      }
+
+      if (activePicker === 'src') {
+        document.getElementById('src-input').value = res.node_id;
+        placeMarker('src', res.lat, res.lon, res.node_id);
+        activePicker = null;
+        updatePickerUI();
+        markRouteStale(`Source node set to ${res.node_id}.`);
+        setStatus(`🟢 Source set to node ${res.node_id}.`, 'success');
+        updateSheetPeekSub(`🟢 Source set: ${res.node_id}`);
+      } else if (activePicker === 'dst') {
+        document.getElementById('dst-input').value = res.node_id;
+        placeMarker('dst', res.lat, res.lon, res.node_id);
+        activePicker = null;
+        updatePickerUI();
+        markRouteStale(`Destination node set to ${res.node_id}.`);
+        setStatus(`🔴 Destination set to node ${res.node_id}.`, 'success');
+        updateSheetPeekSub(`🔴 Destination set: ${res.node_id}`);
+      } else {
+        // Direct click when no explicit picker is toggled
+        const srcVal = document.getElementById('src-input').value.trim();
+        const dstVal = document.getElementById('dst-input').value.trim();
+
+        if (!srcVal) {
+          document.getElementById('src-input').value = res.node_id;
+          placeMarker('src', res.lat, res.lon, res.node_id);
+          markRouteStale(`Source node set to ${res.node_id}.`);
+          setStatus(`🟢 Source set to node ${res.node_id}. Click map again to pick destination.`, 'success');
+          updateSheetPeekSub(`🟢 Source set: ${res.node_id}`);
+        } else if (!dstVal) {
+          document.getElementById('dst-input').value = res.node_id;
+          placeMarker('dst', res.lat, res.lon, res.node_id);
+          markRouteStale(`Destination node set to ${res.node_id}.`);
+          setStatus(`🔴 Destination set to node ${res.node_id}. Click "Find Safe Route".`, 'success');
+          updateSheetPeekSub(`🔴 Destination set: ${res.node_id}`);
+        } else {
+          // Both fields filled: update destination by default
+          document.getElementById('dst-input').value = res.node_id;
+          placeMarker('dst', res.lat, res.lon, res.node_id);
+          markRouteStale(`Destination updated to node ${res.node_id}.`);
+          setStatus(`🔴 Destination updated to node ${res.node_id}. Use "Choose Source on Map" to update source.`, 'success');
+          updateSheetPeekSub(`🔴 Destination updated: ${res.node_id}`);
+        }
+      }
+    });
+
+    function placeMarker(type, lat, lon, nodeId) {
+      const isSrc = type === 'src';
+      const label = isSrc ? '🟢 Origin (Point A)' : '🔴 Destination (Point B)';
+      const letter = isSrc ? 'A' : 'B';
+      const pinClass = isSrc ? 'pin-start' : 'pin-end';
+      const subText = isSrc ? 'Emergency departure point' : 'Designated destination';
+
+      const icon = L.divIcon({
+        className: 'route-pin-wrapper',
+        html: `
+          <div class="smartroute-pin ${pinClass}" aria-label="${label}: Node ${nodeId}">
+            <div class="pin-badge"><span>${letter}</span></div>
+            <div class="pin-pulse"></div>
+          </div>
+        `,
+        iconSize: [28, 36],
+        iconAnchor: [14, 36],
+        popupAnchor: [0, -34]
+      });
+
+      if (isSrc) {
+        if (markerSrc) markerSrc.remove();
+        markerSrc = L.marker([lat, lon], { icon, zIndexOffset: 1000 }).addTo(map)
+          .bindPopup(`<b>${label}</b><br>Node ID: <code>${nodeId}</code><br><span style="font-size:0.75rem;color:#94a3b8">${subText}</span>`);
+      } else {
+        if (markerDst) markerDst.remove();
+        markerDst = L.marker([lat, lon], { icon, zIndexOffset: 1000 }).addTo(map)
+          .bindPopup(`<b>${label}</b><br>Node ID: <code>${nodeId}</code><br><span style="font-size:0.75rem;color:#94a3b8">${subText}</span>`);
+      }
+    }
+
+    // ── Input synchronization & Stale State ────────────────────────────────────
+    function onInputChanged(type) {
+      activeRouteRequestId++;
+      if (activeRouteAbortController) {
+        try { activeRouteAbortController.abort(); } catch (e) { }
+        activeRouteAbortController = null;
+      }
+      const btn = document.getElementById('find-route-btn');
+      if (btn) btn.disabled = false;
+
+      markRouteStale(`Node ID manually updated.`);
+      const dispValEl = document.getElementById('displayed-scenario-val');
+      if (dispValEl) {
+        dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Node changed)</span>';
+      }
+    }
+
+    function markRouteStale(reason) {
+      isRouteStale = true;
+      const banner = document.getElementById('stale-banner');
+      if (banner) {
+        banner.style.display = 'block';
+        banner.innerHTML = `⚠️ <strong>Route stale:</strong> ${reason || 'Parameters changed.'} Click <strong>Find Safe Route</strong> to recalculate.`;
+      }
+      if (routeLayer) {
+        routeLayer.eachLayer(layer => {
+          if (layer.setStyle) {
+            layer.setStyle({ color: '#64748b', opacity: 0.35, dashArray: '4, 8' });
+          }
+        });
+      }
+    }
+
+    function clearRouteStale() {
+      isRouteStale = false;
+      const banner = document.getElementById('stale-banner');
+      if (banner) {
+        banner.style.display = 'none';
+        banner.innerHTML = '';
+      }
+    }
+
+    // ── API helpers ────────────────────────────────────────────────────────────
+    async function apiFetch(path, options = {}) {
+      try {
+        const r = await fetch(API_BASE + path, options);
+        if (!r.ok) {
+          let detail = r.statusText;
+          let isBackendDown = (r.status === 503 || r.status === 502);
+          try {
+            const j = await r.json();
+            detail = j.detail || j.message || j.error || detail;
+            if (j.backend_unavailable) isBackendDown = true;
+          } catch { }
+          setBackendOnlineState(!isBackendDown);
+          return { error: detail, status: r.status, backendUnavailable: isBackendDown };
+        }
+        setBackendOnlineState(true);
+        return await r.json();
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          return { aborted: true };
+        }
+        setBackendOnlineState(false);
+        return {
+          error: 'Backend unavailable. SmartRoute routing engine is unreachable.',
+          backendUnavailable: true,
+          originalError: e.message
+        };
+      }
+    }
+
+    function setBackendOnlineState(isOnline) {
+      isBackendOnline = isOnline;
+      const connBanner = document.getElementById('conn-banner');
+      if (connBanner) {
+        connBanner.style.display = isOnline ? 'none' : 'flex';
+      }
+    }
+
+    // Listen to browser network changes
+    window.addEventListener('offline', () => {
+      setBackendOnlineState(false);
+      setStatus('⚠️ Device is offline. SmartRoute requires server connection to calculate routes.', 'error');
+    });
+    window.addEventListener('online', () => {
+      setBackendOnlineState(true);
+      setStatus('✅ Internet connection restored. Ready to calculate routes.', 'success');
+    });
+
+    function setStatus(msg, type = '') {
+      const el = document.getElementById('status-bar');
+      el.className = type;
+      el.innerHTML = type === 'loading'
+        ? `<span class="spinner"></span>${msg}`
+        : msg;
+    }
+
+    // ── Hour slider ───────────────────────────────────────────────────────────
+    function onHourChange(val) {
+      currentHour = parseInt(val);
+      const h = String(currentHour).padStart(2, '0');
+      document.getElementById('hour-label').textContent = `⏰ ${h}:00`;
+      onConditionsChange();
+    }
+
+    function onConditionsChange() {
+      activeRouteRequestId++;
+      if (activeRouteAbortController) {
+        try { activeRouteAbortController.abort(); } catch (e) { }
+        activeRouteAbortController = null;
+      }
+      const btn = document.getElementById('find-route-btn');
+      if (btn) btn.disabled = false;
+
+      currentWeather = document.getElementById('weather-select').value;
+      markRouteStale('Traffic conditions updated.');
+      const dispValEl = document.getElementById('displayed-scenario-val');
+      if (dispValEl && displayedRouteScenario) {
+        dispValEl.innerHTML = `<span style="color:#f59e0b">⚠️ Stale (${SCENARIO_INFO[displayedRouteScenario]?.name || displayedRouteScenario})</span>`;
+      }
+      if (document.getElementById('heatmap-toggle').checked) {
+        loadHeatmap();
+      }
+    }
+
+    // ── Find Route ────────────────────────────────────────────────────
+    async function findRoute() {
+      const src = document.getElementById('src-input').value.trim();
+      const dst = document.getElementById('dst-input').value.trim();
+      const algo = document.getElementById('algo-select').value;
+      const scenario = document.getElementById('scenario-select').value;
+      const priority = document.getElementById('priority-select').value;
+
+      if (!src || !dst) {
+        setStatus('⚠️ Please enter both source and destination node IDs.', 'error');
+        if (window.innerWidth <= 768 && currentSheetState === 'peek') {
+          setSheetState('half');
+        }
+        return;
+      }
+      if (src === dst) {
+        setStatus('⚠️ Source and destination must be different nodes.', 'error');
+        return;
+      }
+
+      // Cancel any previous in-flight request
+      if (activeRouteAbortController) {
+        try { activeRouteAbortController.abort(); } catch (e) { }
+      }
+      activeRouteAbortController = new AbortController();
+      const currentSignal = activeRouteAbortController.signal;
+      const requestId = ++activeRouteRequestId;
+
+      const btn = document.getElementById('find-route-btn');
+      btn.disabled = true;
+
+      const scenarioName = SCENARIO_INFO[scenario]?.name || scenario;
+      setStatus(`Computing safe route with ${algo.toUpperCase()} for ${scenarioName}…`, 'loading');
+      updateSheetPeekSub(`Calculating route (${algo.toUpperCase()})…`);
+
+      // Keep stale warning banner visible while request is running
+      markRouteStale(`Calculating route for ${scenarioName} (previous route is stale)…`);
+      const dispValEl = document.getElementById('displayed-scenario-val');
+      if (dispValEl) {
+        dispValEl.innerHTML = '<span style="color:#f59e0b">⚠️ Stale (Recalculating…)</span>';
+      }
+
+      try {
+        const url = `/route?src=${encodeURIComponent(src)}&dst=${encodeURIComponent(dst)}&hour=${currentHour}`
+          + `&weather=${encodeURIComponent(currentWeather)}&algo=${encodeURIComponent(algo)}`
+          + `&scenario=${encodeURIComponent(scenario)}&priority=${encodeURIComponent(priority)}`;
+        const data = await apiFetch(url, { signal: currentSignal });
+
+        // If aborted or superseded by a newer request, discard silently
+        if (data?.aborted || requestId !== activeRouteRequestId) {
+          return;
+        }
+
+        // Backend unavailable or error handling
+        if (!data || data.error || data.detail || data.backendUnavailable) {
+          let msg = data?.error;
+          let tip = '';
+          if (data?.detail) {
+            if (typeof data.detail === 'object') {
+              msg = data.detail.message || JSON.stringify(data.detail);
+              tip = data.detail.tip ? `<br><span style="color:#cbd5e1;font-size:0.75rem">${data.detail.tip}</span>` : '';
+            } else {
+              msg = data.detail;
+            }
+          }
+          msg = msg || 'Failed to get route from backend';
+
+          // Critical: Never leave old or stale route displayed on error
+          if (routeLayer) {
+            routeLayer.remove();
+            routeLayer = null;
+          }
+          displayedRouteScenario = null;
+          if (dispValEl) {
+            dispValEl.innerHTML = '<span style="color:#f87171">None (Route unavailable)</span>';
+          }
+          document.getElementById('result-panel').style.display = 'none';
+
+          const banner = document.getElementById('stale-banner');
+          if (banner) {
+            banner.style.display = 'block';
+            banner.innerHTML = `⚠️ <strong>Route unavailable:</strong> ${msg}. No route currently displayed.`;
+          }
+          isRouteStale = true;
+
+          setStatus(`❌ ${msg}${tip}`, 'error');
+          updateSheetPeekSub(`❌ ${msg}`);
+          return;
+        }
+
+        // Latest request succeeded!
+        clearRouteStale();
+        displayedRouteScenario = data.incident_context?.scenario || scenario;
+        const incLabel = data.incident_context?.label || scenarioName;
+        const affectedCount = data.incident_context?.affected_segments ?? 0;
+
+        if (dispValEl) {
+          dispValEl.textContent = `${incLabel} (${affectedCount} segments affected)`;
+        }
+
+        drawRoute(data);
+        showResults(data);
+        setStatus(`✅ Safe route found via ${data.algorithm} — ${incLabel} (${affectedCount} affected segments)`, 'success');
+
+        const etaMin = data.eta_minutes?.toFixed(1) || '—';
+        const distKm = (data.total_distance_m / 1000).toFixed(1);
+        updateSheetPeekSub(`✅ ${distKm}km · ${etaMin}m ETA · ${incLabel}`);
+
+        // On mobile, if sheet was peek, expand to half to show key results
+        if (window.innerWidth <= 768 && currentSheetState === 'peek') {
+          setSheetState('half');
+        }
+      } catch (err) {
+        if (err.name === 'AbortError' || requestId !== activeRouteRequestId) {
+          return;
+        }
         if (routeLayer) {
           routeLayer.remove();
           routeLayer = null;
         }
         displayedRouteScenario = null;
         if (dispValEl) {
-          dispValEl.innerHTML = '<span style="color:#f87171">None (Route unavailable)</span>';
+          dispValEl.innerHTML = '<span style="color:#f87171">None (Connection error)</span>';
         }
         document.getElementById('result-panel').style.display = 'none';
 
-        // Keep stale banner visible explaining failure
         const banner = document.getElementById('stale-banner');
         if (banner) {
           banner.style.display = 'block';
-          banner.innerHTML = `⚠️ <strong>Route unavailable:</strong> ${msg}. No route currently displayed.`;
+          banner.innerHTML = `⚠️ <strong>Connection error:</strong> ${err.message}. Previous route cleared.`;
         }
         isRouteStale = true;
 
-        setStatus(`❌ ${msg}${tip}`, 'error');
-        return;
-      }
-
-      // Latest request succeeded!
-      clearRouteStale();
-      displayedRouteScenario = data.incident_context?.scenario || scenario;
-      const incLabel = data.incident_context?.label || scenarioName;
-      const affectedCount = data.incident_context?.affected_segments ?? 0;
-
-      if (dispValEl) {
-        dispValEl.textContent = `${incLabel} (${affectedCount} segments affected)`;
-      }
-
-      drawRoute(data);
-      showResults(data);
-      setStatus(`✅ Safe route found via ${data.algorithm} — ${incLabel} (${affectedCount} affected segments)`, 'success');
-    } catch (err) {
-      if (err.name === 'AbortError' || requestId !== activeRouteRequestId) {
-        return;
-      }
-      // On failure, do not leave the old route looking current!
-      if (routeLayer) {
-        routeLayer.remove();
-        routeLayer = null;
-      }
-      displayedRouteScenario = null;
-      if (dispValEl) {
-        dispValEl.innerHTML = '<span style="color:#f87171">None (Network error)</span>';
-      }
-      document.getElementById('result-panel').style.display = 'none';
-
-      const banner = document.getElementById('stale-banner');
-      if (banner) {
-        banner.style.display = 'block';
-        banner.innerHTML = `⚠️ <strong>Network error:</strong> ${err.message}. Previous route cleared.`;
-      }
-      isRouteStale = true;
-
-      setStatus(`❌ Network error: ${err.message}`, 'error');
-    } finally {
-      if (requestId === activeRouteRequestId) {
-        btn.disabled = false;
+        setStatus(`❌ Connection error: ${err.message}`, 'error');
+        updateSheetPeekSub('❌ Connection error');
+      } finally {
+        if (requestId === activeRouteRequestId) {
+          btn.disabled = false;
+        }
       }
     }
-  }
 
-  // ── Draw Route on Map ─────────────────────────────────────────────────────
-  function drawRoute(data) {
-    if (routeLayer) routeLayer.remove();
-    if (!data.path || data.path.length === 0) return;
+    // ── Draw Route on Map ─────────────────────────────────────────────────────
+    function drawRoute(data) {
+      if (routeLayer) routeLayer.remove();
+      if (!data.path || data.path.length === 0) return;
 
-    const coords = data.path.map(n => [n.lat, n.lon]);
+      const coords = data.path.map(n => [n.lat, n.lon]);
 
-    routeLayer = L.layerGroup();
+      routeLayer = L.layerGroup();
 
-    // Animated dashed route line
-    L.polyline(coords, {
-      color: '#60a5fa',
-      weight: 5,
-      opacity: 0.9,
-      dashArray: '10, 6',
-      lineCap: 'round'
-    }).addTo(routeLayer);
+      // Layer 1: Dark high-contrast casing so route line stands out against OSM map & colored incident overlays
+      L.polyline(coords, {
+        color: '#020617',
+        weight: 10,
+        opacity: 0.9,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(routeLayer);
 
-    // Source + destination markers with labels
-    const first = data.path[0];
-    const last  = data.path[data.path.length - 1];
-    placeMarker('src', first.lat, first.lon, data.src);
-    placeMarker('dst', last.lat,  last.lon,  data.dst);
+      // Layer 2: Vibrant primary route line
+      L.polyline(coords, {
+        color: '#2563eb',
+        weight: 6,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(routeLayer);
 
-    routeLayer.addTo(map);
-    map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
-  }
+      // Layer 3: Subtle luminous core accent
+      L.polyline(coords, {
+        color: '#93c5fd',
+        weight: 2.5,
+        opacity: 1.0,
+        dashArray: '8, 8',
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(routeLayer);
 
-  // ── Show Result Panel ─────────────────────────────────────────────────────
-  function showResults(data) {
-    const panel = document.getElementById('result-panel');
-    panel.style.display = 'block';
+      // Source + destination markers with distinct A/B pins
+      const first = data.path[0];
+      const last = data.path[data.path.length - 1];
+      placeMarker('src', first.lat, first.lon, data.src);
+      placeMarker('dst', last.lat, last.lon, data.dst);
 
-    const ctx  = data.congestion_context || {};
-    const inc  = data.incident_context   || {};
-    const cong = ctx.congestion_level || 'Low';
-    const condition = inc.condition || 'clear';
-    const affected = inc.affected_segments ?? 0;
+      routeLayer.addTo(map);
 
-    // Displayed route scenario banner in result panel
-    const resScenName = document.getElementById('result-scenario-name');
-    if (resScenName) {
-      resScenName.innerHTML = `<span>${inc.label || inc.scenario}</span> `
-        + `<span style="color:#fbbf24;font-weight:600;font-size:0.72rem;">(${affected} affected segments)</span>`;
+      // Ensure route layer and markers stay visually above incident overlays
+      if (incidentLayer && routeLayer.bringToFront) {
+        routeLayer.bringToFront();
+      }
+      if (markerSrc && markerSrc.bringToFront) markerSrc.bringToFront();
+      if (markerDst && markerDst.bringToFront) markerDst.bringToFront();
+
+      // Dynamic responsive padding so full route is visible without being hidden by bottom sheet or legend
+      const isMobile = window.innerWidth <= 768;
+      let topPad = 40;
+      let bottomPad = 40;
+      let leftPad = 35;
+      let rightPad = 35;
+
+      if (isMobile) {
+        topPad = 65;   // Room for top legend pill and zoom controls
+        rightPad = 50; // Room for zoom controls on the right
+        if (currentSheetState === 'peek') {
+          bottomPad = 120; // Room for bottom-sheet peek bar + quick route button
+        } else if (currentSheetState === 'half') {
+          bottomPad = Math.round(window.innerHeight * 0.50 + 20); // Room for half sheet
+        } else {
+          bottomPad = Math.round(window.innerHeight * 0.75); // Room for expanded sheet
+        }
+      }
+
+      map.fitBounds(L.latLngBounds(coords), {
+        paddingTopLeft: [leftPad, topPad],
+        paddingBottomRight: [rightPad, bottomPad],
+        maxZoom: 16
+      });
     }
 
-    // Badge
-    document.getElementById('congestion-badge-container').innerHTML =
-      `<span class="congestion-badge badge-${cong}">${cong} Traffic</span>`;
+    // ── Show Result Panel ─────────────────────────────────────────────────────
+    function showResults(data) {
+      const panel = document.getElementById('result-panel');
+      panel.style.display = 'block';
 
-    // Stats
-    const distKm = (data.total_distance_m / 1000).toFixed(2);
-    const eta    = data.eta_minutes?.toFixed(1) || '—';
-    const nodes  = data.num_nodes || '—';
-    document.getElementById('stats-grid').innerHTML = `
+      const ctx = data.congestion_context || {};
+      const inc = data.incident_context || {};
+      const cong = ctx.congestion_level || 'Low';
+      const condition = inc.condition || 'clear';
+      const affected = inc.affected_segments ?? 0;
+      const scenKey = inc.scenario || currentScenario;
+
+      // Displayed route scenario banner in result panel
+      const resScenName = document.getElementById('result-scenario-name');
+      if (resScenName) {
+        resScenName.innerHTML = `<span>${inc.label || inc.scenario}</span> `
+          + `<span style="color:#fbbf24;font-weight:600;font-size:0.72rem;">(${affected} affected segments)</span>`;
+      }
+
+      // Badge
+      document.getElementById('congestion-badge-container').innerHTML =
+        `<span class="congestion-badge badge-${cong}">${cong} Traffic</span>`;
+
+      // Stats (Using strictly verified backend values)
+      const distKm = (data.total_distance_m / 1000).toFixed(2);
+      const eta = data.eta_minutes?.toFixed(1) || '—';
+      const nodes = data.num_nodes || '—';
+      document.getElementById('stats-grid').innerHTML = `
       <div class="stat-card"><div class="val">${distKm}</div><div class="lbl">km</div></div>
       <div class="stat-card"><div class="val">${eta}</div><div class="lbl">min ETA</div></div>
       <div class="stat-card"><div class="val">${nodes}</div><div class="lbl">waypoints</div></div>
       <div class="stat-card"><div class="val">${affected}</div><div class="lbl">affected segments</div></div>`;
 
-    // Incident panel
-    const incPanel  = document.getElementById('incident-panel');
-    const incHeader = document.getElementById('incident-header');
-    const incBody   = document.getElementById('incident-body');
+      // Incident panel & Diversion reason
+      const incPanel = document.getElementById('incident-panel');
+      const incHeader = document.getElementById('incident-header');
+      const incBody = document.getElementById('incident-body');
 
-    const condClass = {
-      blocked: 'incident-blocked',
-      flooded: 'incident-flooded',
-      inaccessible: 'incident-inaccessible',
-      congested: 'incident-congested',
-      clear: 'incident-clear',
-    }[condition] || 'incident-clear';
+      const condClass = {
+        blocked: 'incident-blocked',
+        flooded: 'incident-flooded',
+        inaccessible: 'incident-inaccessible',
+        congested: 'incident-congested',
+        clear: 'incident-clear',
+      }[condition] || 'incident-clear';
 
-    const condIcon = {
-      blocked: '🔴', flooded: '🌊', inaccessible: '🚧',
-      congested: '🟠', clear: '🟢',
-    }[condition] || '🟢';
+      const condIcon = {
+        blocked: '🔴', flooded: '🌊', inaccessible: '🚧',
+        congested: '🟠', clear: '🟢',
+      }[condition] || '🟢';
 
-    incPanel.style.display = 'block';
-    incPanel.className = `incident-panel ${condClass}`;
+      let diversionExplanation = '';
+      if (scenKey === 'road_closure') {
+        diversionExplanation = '⛔ 100 Feet Road corridor is closed (simulated). Path safely reroutes via adjacent parallel arteries (e.g. 12th Main / CMH Rd).';
+      } else if (scenKey === 'flash_flood') {
+        diversionExplanation = '🌊 Swami Vivekananda Road is flooded and impassable (simulated). Path avoids the flooded low-lying corridor.';
+      } else if (scenKey === 'access_restriction') {
+        diversionExplanation = '🚧 11th Main Road has access restrictions (simulated). Path adjusts according to the selected emergency priority profile.';
+      } else if (scenKey === 'congestion_spike') {
+        diversionExplanation = '⏱️ 80 Feet Road has simulated severe congestion (2.5× weight). High-friction bottlenecks are avoided where alternatives exist.';
+      } else {
+        diversionExplanation = '🟢 Baseline traffic conditions. Path follows the standard optimal time-weighted corridor.';
+      }
 
-    incHeader.textContent = `${condIcon} ${inc.label || 'Normal conditions'} (${affected} affected segments)`;
-    incBody.innerHTML = `
+      incPanel.style.display = 'block';
+      incPanel.className = `incident-panel ${condClass}`;
+
+      incHeader.textContent = `${condIcon} ${inc.label || 'Normal conditions'} (${affected} affected segments)`;
+      incBody.innerHTML = `
       <div class="row"><span class="key">Incident label</span><span class="val">${inc.label || 'Normal conditions'}</span></div>
       <div class="row"><span class="key">Condition</span><span class="val">${condition}</span></div>
       <div class="row"><span class="key">Affected segments</span><span class="val">${affected} segments</span></div>
       <div class="row"><span class="key">Route profile</span><span class="val">${inc.priority || 'standard'}</span></div>
+      <div class="row"><span class="key">Routing algorithm</span><span class="val">${data.algorithm?.toUpperCase() || 'A*'}</span></div>
       <div class="row"><span class="key">Applied scenario</span><span class="val">${inc.scenario || 'normal'}</span></div>
       ${inc.emergency_high_congestion_segments > 0
-        ? `<div class="row"><span class="key">High-congestion rerouted</span>
+          ? `<div class="row"><span class="key">High-congestion rerouted</span>
            <span class="val">${inc.emergency_high_congestion_segments} segments</span></div>` : ''}
       <div class="row"><span class="key">Data source</span>
         <span class="val" style="color:#f59e0b;font-size:0.72rem">⚠️ SIMULATED</span></div>
-      <div class="sim-note">Note: A route changes only when an incident impacts a competitive path. If no viable alternative exists, cost and ETA increase without diversion.</div>
+      <div class="sim-note" style="margin-top:8px;border-left:3px solid #3b82f6;background:#0c1929;">
+        <strong style="color:#93c5fd;">Diversion Analysis:</strong> ${diversionExplanation}
+        <div style="margin-top:4px;color:#94a3b8;font-size:0.68rem;">Note: Diversions occur only when an incident impacts a competitive path. If no viable alternative exists, cost and ETA increase without diversion.</div>
+      </div>
     `;
 
-    // Congestion description
-    document.getElementById('congestion-desc').textContent =
-      ctx.description || '';
-  }
-
-  // ── Clear Route ───────────────────────────────────────────────────────────
-  function clearRoute() {
-    activeRouteRequestId++;
-    if (activeRouteAbortController) {
-      try { activeRouteAbortController.abort(); } catch (e) {}
-      activeRouteAbortController = null;
-    }
-    const btn = document.getElementById('find-route-btn');
-    if (btn) btn.disabled = false;
-
-    if (routeLayer) routeLayer.remove();
-    if (markerSrc)  markerSrc.remove();
-    if (markerDst)  markerDst.remove();
-    routeLayer = markerSrc = markerDst = null;
-    displayedRouteScenario = null;
-    const dispValEl = document.getElementById('displayed-scenario-val');
-    if (dispValEl) {
-      dispValEl.textContent = 'None (cleared)';
+      document.getElementById('congestion-desc').textContent =
+        ctx.description || '';
     }
 
-    document.getElementById('src-input').value = '';
-    document.getElementById('dst-input').value = '';
-    document.getElementById('result-panel').style.display = 'none';
-    clearRouteStale();
-    activePicker = null;
-    updatePickerUI();
-    setStatus('Route cleared. Enter node IDs or pick points on map.');
-  }
-
-  // ── Heatmap ───────────────────────────────────────────────────────────────
-  async function toggleHeatmap() {
-    const enabled = document.getElementById('heatmap-toggle').checked;
-    if (enabled) {
-      await loadHeatmap();
-    } else {
-      if (heatmapLayer) { heatmapLayer.remove(); heatmapLayer = null; }
-    }
-  }
-
-  async function loadHeatmap() {
-    if (heatmapLayer) heatmapLayer.remove();
-    setStatus('Loading simulated traffic heatmap…', 'loading');
-
-    const day = new Date().getDay();
-    const url = `/heatmap?hour=${currentHour}&weather=${encodeURIComponent(currentWeather)}&day=${day}`;
-    const data = await apiFetch(url);
-
-    if (!data || !data.features) {
-      setStatus('❌ Could not load heatmap (graph data missing)', 'error');
-      return;
-    }
-
-    heatmapLayer = L.geoJSON(data, {
-      style: feature => ({
-        color: feature.properties.color,
-        weight: 3,
-        opacity: 0.75
-      }),
-      onEachFeature: (feature, layer) => {
-        const p = feature.properties;
-        layer.bindPopup(
-          `<b>${p.congestion}</b> congestion (simulated)<br>${p.length_m}m segment`
-        );
+    // ── Clear Route ───────────────────────────────────────────────────────────
+    function clearRoute() {
+      activeRouteRequestId++;
+      if (activeRouteAbortController) {
+        try { activeRouteAbortController.abort(); } catch (e) { }
+        activeRouteAbortController = null;
       }
-    }).addTo(map);
+      const btn = document.getElementById('find-route-btn');
+      if (btn) btn.disabled = false;
 
-    setStatus(`✅ Heatmap loaded (${data.features.length} segments, simulated)`, 'success');
-  }
+      if (routeLayer) routeLayer.remove();
+      if (markerSrc) markerSrc.remove();
+      if (markerDst) markerDst.remove();
+      routeLayer = markerSrc = markerDst = null;
+      displayedRouteScenario = null;
+      const dispValEl = document.getElementById('displayed-scenario-val');
+      if (dispValEl) {
+        dispValEl.textContent = 'None (cleared)';
+      }
 
-  // ── Init: setup default state and markers ──────────────────────────────────
-  (async () => {
-    const summary = await apiFetch('/graph/summary');
-    if (summary && summary.center_lat) {
-      map.setView([summary.center_lat, summary.center_lon], 14);
+      document.getElementById('src-input').value = '';
+      document.getElementById('dst-input').value = '';
+      document.getElementById('result-panel').style.display = 'none';
+      clearRouteStale();
+      activePicker = null;
+      updatePickerUI();
+      setStatus('Route cleared. Enter node IDs or pick points on map.');
+      updateSheetPeekSub('Route cleared · Tap to plan');
     }
-    // Place initial markers for default points
-    const defaultNormal = PRESETS.normal;
-    placeMarker('src', defaultNormal.srcLat, defaultNormal.srcLon, defaultNormal.src);
-    placeMarker('dst', defaultNormal.dstLat, defaultNormal.dstLon, defaultNormal.dst);
-    document.getElementById('preset-normal').classList.add('active');
-  })();
-</script>
+
+    // ── Heatmap ───────────────────────────────────────────────────────────────
+    async function toggleHeatmap() {
+      const enabled = document.getElementById('heatmap-toggle').checked;
+      if (enabled) {
+        await loadHeatmap();
+      } else {
+        if (heatmapLayer) { heatmapLayer.remove(); heatmapLayer = null; }
+      }
+    }
+
+    async function loadHeatmap() {
+      if (heatmapLayer) heatmapLayer.remove();
+      setStatus('Loading simulated traffic heatmap…', 'loading');
+
+      const day = new Date().getDay();
+      const url = `/heatmap?hour=${currentHour}&weather=${encodeURIComponent(currentWeather)}&day=${day}`;
+      const data = await apiFetch(url);
+
+      if (!data || !data.features) {
+        setStatus('❌ Could not load heatmap (graph data missing)', 'error');
+        return;
+      }
+
+      heatmapLayer = L.geoJSON(data, {
+        style: feature => ({
+          color: feature.properties.color,
+          weight: 3,
+          opacity: 0.75
+        }),
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties;
+          layer.bindPopup(
+            `<b>${p.congestion}</b> congestion (simulated)<br>${p.length_m}m segment`
+          );
+        }
+      }).addTo(map);
+
+      setStatus(`✅ Heatmap loaded (${data.features.length} segments, simulated)`, 'success');
+    }
+
+    // ── Service Worker Registration ───────────────────────────────────────────
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => {
+            console.log('[SmartRoute] Service worker registered with scope:', reg.scope);
+          })
+          .catch((err) => {
+            console.warn('[SmartRoute] Service worker registration failed:', err);
+          });
+      });
+    }
+
+    // ── Init: setup default state and markers ──────────────────────────────────
+    (async () => {
+      // Initial sheet state for mobile
+      if (window.innerWidth <= 768) {
+        setSheetState('peek');
+      }
+
+      const summary = await apiFetch('/graph/summary');
+      if (summary && summary.center_lat) {
+        map.setView([summary.center_lat, summary.center_lon], 14);
+      }
+      // Place initial markers for default points
+      const defaultNormal = PRESETS.normal;
+      placeMarker('src', defaultNormal.srcLat, defaultNormal.srcLon, defaultNormal.src);
+      placeMarker('dst', defaultNormal.dstLat, defaultNormal.dstLon, defaultNormal.dst);
+      document.getElementById('preset-normal').classList.add('active');
+      updateLegend('normal');
+    })();
+  </script>
 </body>
+
 </html>

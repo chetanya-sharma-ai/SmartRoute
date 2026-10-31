@@ -29,6 +29,25 @@ data/raw/
 data/*.osm
 data/*.graphml
 
+# Generated city graph files (regenerate with export_city_graph.py)
+data/graph_data.json
+data/graph_nodes.csv
+data/graph_edges.csv
+data/graph_summary.json
+
+# Large synthetic training data (regenerate with generate_synthetic_traffic.py)
+data/traffic_data.csv
+
+# Compiled C++ binary copied into api/ (build from source)
+api/smartroute_engine.exe
+api/smartroute_engine
+
+# Trained ML model files (24 MB+; regenerate with ml/train_models.py)
+# Uncomment if you want to exclude models from git:
+# models/*.pkl
+# models/features.json
+# models/metrics.json
+
 # IDE
 .vscode/
 .idea/
@@ -47,3 +66,4 @@ Thumbs.db
 .pytest_cache/
 cache/
 data/edge_weights_*.json
+

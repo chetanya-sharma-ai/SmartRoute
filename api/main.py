@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from .engine_runner import run_cpp_engine
 from .ml_inference import MLInference
-from .route_scenarios import create_route_weights
+from .route_scenarios import create_route_weights, get_scenario_overlay_data
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -122,6 +122,24 @@ def graph_summary():
         raise HTTPException(404, "Graph summary not found. Run export_city_graph.py")
     with open(SUMMARY_JSON, encoding="utf-8") as f:
         return json.load(f)
+
+
+@app.get("/scenarios/overlay", tags=["Scenarios"])
+def get_scenario_overlay(
+    scenario: Literal[
+        "normal", "road_closure", "flash_flood", "access_restriction", "congestion_spike"
+    ] = Query(default="normal", description="Scenario name to retrieve overlay GeoJSON")
+):
+    """
+    Return GeoJSON FeatureCollection of affected road segments for a simulated scenario.
+    All data is simulated based on OpenStreetMap geometry.
+    """
+    if not os.path.exists(GRAPH_JSON):
+        raise HTTPException(503, "Graph data not found. Run export_city_graph.py")
+    try:
+        return get_scenario_overlay_data(GRAPH_JSON, scenario)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @app.get("/route", tags=["Routing"], response_model=RouteResponse)

@@ -126,10 +126,10 @@ def predict_congestion(clf, features, label_inv, hour, weather):
 
 def apply_ml_weights(adj, clf, features, label_inv, hour, weather):
     """Apply ML-predicted congestion multipliers to all edges."""
+    cong = predict_congestion(clf, features, label_inv, hour, weather)
+    mult = CONGESTION_MULTIPLIER[cong]
     for from_id, edges in adj.items():
         for edge in edges:
-            cong = predict_congestion(clf, features, label_inv, hour, weather)
-            mult = CONGESTION_MULTIPLIER[cong]
             edge["time_adjusted"] = edge["time"] * mult
             edge["congestion"] = cong
     return adj

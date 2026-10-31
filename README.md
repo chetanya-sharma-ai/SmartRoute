@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/RandomForest-88.5%25_synthetic-green" alt="RandomForest">
   <img src="https://img.shields.io/badge/Leaflet.js-Map-4CAF50?logo=leaflet" alt="Leaflet">
-  <img src="https://img.shields.io/badge/Tests-40_passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-46_passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/Docker-Multi--stage-2496ED?logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Data-Simulated-yellow" alt="Simulated">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT">
