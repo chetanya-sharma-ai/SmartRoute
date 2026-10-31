@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+    <linearGradient id="routeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="nodeGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4" />
+
+  <!-- Road grid subtle overlay -->
+  <g opacity="0.12" stroke="#94a3b8" stroke-width="3" stroke-dasharray="8 8">
+    <line x1="80" y1="120" x2="432" y2="120" />
+    <line x1="80" y1="256" x2="432" y2="256" />
+    <line x1="80" y1="392" x2="432" y2="392" />
+    <line x1="140" y1="80" x2="140" y2="432" />
+    <line x1="256" y1="80" x2="256" y2="432" />
+    <line x1="372" y1="80" x2="372" y2="432" />
+  </g>
+
+  <!-- Shield / Route Badge in Center -->
+  <path d="M 256,64 L 396,116 C 396,252 336,368 256,424 C 176,368 116,252 116,116 Z"
+        fill="url(#shieldGrad)" opacity="0.22" />
+  <path d="M 256,64 L 396,116 C 396,252 336,368 256,424 C 176,368 116,252 116,116 Z"
+        fill="none" stroke="url(#routeGrad)" stroke-width="8" stroke-linejoin="round" opacity="0.6" />
+
+  <!-- Dynamic Curved Route Path -->
+  <path d="M 140,370 C 180,310 210,340 256,256 C 300,180 320,160 372,130"
+        fill="none" stroke="#1d4ed8" stroke-width="28" stroke-linecap="round" opacity="0.4" filter="url(#glow)" />
+  <path d="M 140,370 C 180,310 210,340 256,256 C 300,180 320,160 372,130"
+        fill="none" stroke="url(#routeGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M 140,370 C 180,310 210,340 256,256 C 300,180 320,160 372,130"
+        fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-dasharray="14 14" opacity="0.85" />
+
+  <!-- Blocked Hazard Route Branch -->
+  <path d="M 256,256 C 290,290 320,320 370,340"
+        fill="none" stroke="#ef4444" stroke-width="10" stroke-linecap="round" stroke-dasharray="8 8" opacity="0.75" />
+  
+  <!-- Hazard Block Cross Mark -->
+  <g transform="translate(370, 340)">
+    <circle r="18" fill="#7f1d1d" stroke="#ef4444" stroke-width="4" />
+    <line x1="-8" y1="-8" x2="8" y2="8" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+    <line x1="8" y1="-8" x2="-8" y2="8" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+  </g>
+
+  <!-- Route Nodes -->
+  <!-- Start Node (Green) -->
+  <g transform="translate(140, 370)" filter="url(#nodeGlow)">
+    <circle r="26" fill="#14532d" stroke="#22c55e" stroke-width="6" />
+    <circle r="12" fill="#ffffff" />
+  </g>
+
+  <!-- Intermediate Smart Routing Waypoint -->
+  <g transform="translate(256, 256)">
+    <circle r="18" fill="#1e3a5f" stroke="#38bdf8" stroke-width="5" />
+    <circle r="7" fill="#60a5fa" />
+  </g>
+
+  <!-- End Node (Red Destination Marker Pin) -->
+  <g transform="translate(372, 130)" filter="url(#nodeGlow)">
+    <path d="M 0,-34 C -18,-34 -30,-20 -30,-2 C -30,20 0,42 0,42 C 0,42 30,20 30,-2 C 30,-20 18,-34 0,-34 Z"
+          fill="#ef4444" stroke="#ffffff" stroke-width="4" />
+    <circle cy="-4" r="10" fill="#ffffff" />
+  </g>
+
+  <!-- Navigation Arrow Pulse -->
+  <polygon points="274,232 290,244 274,256" fill="#38bdf8" />
+</svg>

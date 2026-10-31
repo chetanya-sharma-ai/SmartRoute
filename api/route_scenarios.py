@@ -14,6 +14,83 @@ def load_scenarios() -> dict:
         return json.load(scenario_file)["scenarios"]
 
 
+def get_scenario_overlay_data(graph_path: str, scenario: str) -> dict:
+    """Extract GeoJSON features for edges affected by the given simulated scenario."""
+    scenarios = load_scenarios()
+    if scenario not in scenarios:
+        valid = ", ".join(sorted(scenarios.keys()))
+        raise ValueError(f"Unknown scenario '{scenario}'. Valid values: {valid}")
+
+    definition = scenarios[scenario]
+    if scenario == "normal" or not definition.get("road_names"):
+        return {
+            "type": "FeatureCollection",
+            "scenario": "normal",
+            "label": definition.get("label", "Normal conditions"),
+            "condition": None,
+            "multiplier": 1.0,
+            "road_names": [],
+            "data_source": "simulated demo scenario; not a live incident feed",
+            "affected_segments": 0,
+            "features": []
+        }
+
+    with open(graph_path, encoding="utf-8") as gf:
+        graph = json.load(gf)
+
+    nodes_map = {int(n["id"]): n for n in graph.get("nodes", [])}
+    road_names = {name.casefold() for name in definition.get("road_names", [])}
+    condition = definition.get("condition")
+    multiplier = float(definition.get("multiplier", 1.0))
+    label = definition.get("label", scenario)
+
+    features = []
+    for edge in graph.get("edges", []):
+        if "from" not in edge or "to" not in edge:
+            continue
+        edge_name = str(edge.get("name", "")).strip()
+        if edge_name.casefold() in road_names:
+            u_id = int(edge["from"])
+            v_id = int(edge["to"])
+            u = nodes_map.get(u_id)
+            v = nodes_map.get(v_id)
+            if u and v:
+                features.append({
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [float(u["lon"]), float(u["lat"])],
+                            [float(v["lon"]), float(v["lat"])]
+                        ]
+                    },
+                    "properties": {
+                        "from": u_id,
+                        "to": v_id,
+                        "name": edge_name,
+                        "length_m": float(edge.get("length", 0.0)),
+                        "speed_kph": float(edge.get("speed_kph", 40.0)),
+                        "condition": condition,
+                        "multiplier": multiplier,
+                        "scenario": scenario,
+                        "label": label,
+                        "data_source": "simulated demo scenario; not a live incident feed"
+                    }
+                })
+
+    return {
+        "type": "FeatureCollection",
+        "scenario": scenario,
+        "label": label,
+        "condition": condition,
+        "multiplier": multiplier,
+        "road_names": definition.get("road_names", []),
+        "data_source": "simulated demo scenario; not a live incident feed",
+        "affected_segments": len(features),
+        "features": features
+    }
+
+
 def create_route_weights(graph_path: str, base_weights_path: str | None,
                          scenario: str, priority: str) -> tuple[str, dict]:
     """Create a temporary C++-compatible weight file with demo incidents applied.

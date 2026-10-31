@@ -140,3 +140,61 @@ def test_simulate_all_hours_return_valid_congestion():
     for entry in r.json()["hourly"]:
         assert entry["congestion_level"] in ("Low", "Medium", "High")
         assert entry["multiplier"] >= 1.0
+
+
+def test_scenarios_overlay_endpoints():
+    """Verify overlay GeoJSON endpoints return verified geometry for all simulated scenarios."""
+    # 1. Normal: 0 segments, empty features
+    r_norm = client.get("/scenarios/overlay?scenario=normal")
+    assert r_norm.status_code == 200
+    d_norm = r_norm.json()
+    assert d_norm["scenario"] == "normal"
+    assert d_norm["affected_segments"] == 0
+    assert len(d_norm["features"]) == 0
+    assert "simulated" in d_norm["data_source"].lower()
+
+    # 2. Road closure: 15 segments along 100 Feet Road
+    r_close = client.get("/scenarios/overlay?scenario=road_closure")
+    assert r_close.status_code == 200
+    d_close = r_close.json()
+    assert d_close["scenario"] == "road_closure"
+    assert d_close["condition"] == "blocked"
+    assert d_close["affected_segments"] == 15
+    assert len(d_close["features"]) == 15
+    assert all("100 Feet Road" in f["properties"]["name"] for f in d_close["features"])
+
+    # 3. Flash flood: 10 segments along Swamy Vivekananda Road
+    r_flood = client.get("/scenarios/overlay?scenario=flash_flood")
+    assert r_flood.status_code == 200
+    d_flood = r_flood.json()
+    assert d_flood["scenario"] == "flash_flood"
+    assert d_flood["condition"] == "flooded"
+    assert d_flood["affected_segments"] == 10
+    assert len(d_flood["features"]) == 10
+    assert all("Swamy Vivekananda Road" in f["properties"]["name"] for f in d_flood["features"])
+
+    # 4. Access restriction: 22 segments along 11th Main Road
+    r_access = client.get("/scenarios/overlay?scenario=access_restriction")
+    assert r_access.status_code == 200
+    d_access = r_access.json()
+    assert d_access["scenario"] == "access_restriction"
+    assert d_access["condition"] == "inaccessible"
+    assert d_access["affected_segments"] == 22
+    assert len(d_access["features"]) == 22
+    assert all("11th Main Road" in f["properties"]["name"] for f in d_access["features"])
+
+    # 5. Congestion spike: 34 segments along 80 Feet Road
+    r_spike = client.get("/scenarios/overlay?scenario=congestion_spike")
+    assert r_spike.status_code == 200
+    d_spike = r_spike.json()
+    assert d_spike["scenario"] == "congestion_spike"
+    assert d_spike["condition"] == "congested"
+    assert d_spike["affected_segments"] == 34
+    assert len(d_spike["features"]) == 34
+    assert all("80 Feet Road" in f["properties"]["name"] for f in d_spike["features"])
+
+
+def test_scenarios_overlay_invalid_scenario():
+    """Invalid scenario name must be rejected with 422."""
+    r = client.get("/scenarios/overlay?scenario=alien_invasion")
+    assert r.status_code == 422
